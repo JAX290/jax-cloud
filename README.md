@@ -36,11 +36,12 @@ sudo bash install.sh --authkey tskey-auth-xxxxxxxxxxxx
 脚本会依次完成：
 
 1. 安装 Tailscale，加入 tailnet，开启 Tailscale SSH
-2. 安装 Docker / docker compose
-3. 下载本仓库代码到 `/opt/jax-cloud`
-4. 构建镜像并启动，应用只绑定 Tailscale IP
-5. 首次启动自动初始化数据库和演示数据
-6. 开启 ufw：拒绝公网入站，只放行 `tailscale0`
+2. 配置 2G swap（4G 内存构建 Next.js 用）
+3. 安装 Docker / docker compose
+4. 下载本仓库代码到 `/opt/jax-cloud`
+5. 构建镜像并启动，应用只绑定 Tailscale IP
+6. 首次启动自动初始化数据库和演示数据
+7. 开启 ufw：拒绝公网入站，只放行 `tailscale0`
 
 ## 部署完成后
 

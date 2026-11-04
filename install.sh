@@ -65,7 +65,7 @@ echo "==> 1/7 安装基础依赖"
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates tar openssl ufw
 
-echo "==> 2/7 安装 Tailscale 并加入 tailnet"
+echo "==> 2/8 安装 Tailscale 并加入 tailnet"
 if ! command -v tailscale >/dev/null 2>&1; then
   curl -fsSL https://tailscale.com/install.sh | sh
 fi
@@ -96,7 +96,18 @@ if [ -z "$TS_IP" ]; then
 fi
 echo "    Tailscale IP: $TS_IP"
 
-echo "==> 3/7 安装 Docker"
+echo "==> 3/8 配置 2G swap（4G 内存构建 Next.js 用）"
+if ! swapon --show | grep -q '/swapfile'; then
+  if [ ! -f /swapfile ]; then
+    fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+    chmod 600 /swapfile
+    mkswap /swapfile
+  fi
+  swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >>/etc/fstab
+fi
+
+echo "==> 4/8 安装 Docker"
 if ! command -v docker >/dev/null 2>&1; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose || \
     DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2
@@ -113,7 +124,7 @@ if ! docker compose version >/dev/null 2>&1; then
   fi
 fi
 
-echo "==> 4/7 准备代码"
+echo "==> 5/8 准备代码"
 if [ -n "$APP_SRC" ] && [ -f "$APP_SRC/Dockerfile" ]; then
   SRC_DIR="$APP_SRC"
 else
@@ -140,7 +151,7 @@ cp -a "$SRC_DIR"/. "$APP_DIR"/
 mkdir -p "$APP_DIR/data" "$APP_DIR/media"
 cd "$APP_DIR"
 
-echo "==> 5/7 写入环境变量"
+echo "==> 6/8 写入环境变量"
 if [ ! -f "$APP_DIR/.env" ]; then
   SECRET="$(openssl rand -hex 32 2>/dev/null || date +%s%N | sha256sum | cut -d' ' -f1)"
   cat > "$APP_DIR/.env" <<EOF
@@ -164,7 +175,7 @@ else
     echo "BIND_IP=$TS_IP" >> "$APP_DIR/.env"
 fi
 
-echo "==> 6/7 构建并启动"
+echo "==> 7/8 构建并启动"
 $COMPOSE -f docker-compose.tailscale.yml up -d --build
 
 if [ ! -f "$APP_DIR/data/jax.db" ]; then
@@ -188,7 +199,7 @@ if ! curl -fsS "http://$TS_IP:3000/" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "==> 7/7 关闭公网访问"
+echo "==> 8/8 关闭公网访问"
 if [ "$ENABLE_FIREWALL" = "1" ]; then
   ufw default deny incoming
   ufw default allow outgoing
