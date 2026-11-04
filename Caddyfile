@@ -1,0 +1,10 @@
+{$SITE_ADDRESS:cloud.jax.markets} {
+	encode gzip zstd
+	reverse_proxy app:3000
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    container_name: jax-cloud
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: file:/app/data/jax.db
+    volumes:
+      - ./data:/app/data
+      - ./media:/app/media
+    # 只绑定 Tailscale IP，公网无法访问 3000
+    ports:
+      - "${BIND_IP:?BIND_IP missing}:3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
