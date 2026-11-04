@@ -14,14 +14,18 @@
 - 勾选 **Reusable**、**Pre-approved**
 - 建议打标签 `tag:server`
 
-然后在全新服务器上以 root 执行：
+然后在一台**全新 Debian 12/13** 服务器上以 root 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JAX290/jax-cloud/main/install.sh | \
+curl -fsSL -H "Accept: application/vnd.github.raw" \
+  https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | \
   sudo bash -s -- --authkey tskey-auth-xxxxxxxxxxxx
 ```
 
-或者克隆仓库后执行：
+> 部分网络访问 `raw.githubusercontent.com` 会失败，所以这里走 GitHub API 取脚本；
+> 如果 API 也限流，用下面的 clone 方式。
+
+也可以克隆仓库后执行：
 
 ```bash
 git clone https://github.com/JAX290/jax-cloud.git

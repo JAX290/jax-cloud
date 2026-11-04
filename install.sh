@@ -124,8 +124,12 @@ else
       "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/tarball/$REPO_BRANCH" \
       -o "$TMP_DIR/src.tar.gz"
   else
-    curl -fsSL "https://github.com/$REPO_OWNER/$REPO_NAME/archive/refs/heads/$REPO_BRANCH.tar.gz" \
-      -o "$TMP_DIR/src.tar.gz"
+    # 优先 API（raw.githubusercontent 在部分网络不可达），失败再走 codeload
+    if ! curl -fsSL "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/tarball/$REPO_BRANCH" \
+      -o "$TMP_DIR/src.tar.gz"; then
+      curl -fsSL "https://codeload.github.com/$REPO_OWNER/$REPO_NAME/tar.gz/refs/heads/$REPO_BRANCH" \
+        -o "$TMP_DIR/src.tar.gz"
+    fi
   fi
   tar -xzf "$TMP_DIR/src.tar.gz" -C "$TMP_DIR" --strip-components=1
   SRC_DIR="$TMP_DIR"
