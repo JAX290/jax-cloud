@@ -893,7 +893,7 @@ h2 {
 .subs-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
 }
 
 .sub-card {
@@ -999,6 +999,80 @@ h2 {
 .status.suspended {
   border-color: rgba(255, 176, 32, 0.4);
   color: #ffd189;
+}
+
+/* ===== deploy line ===== */
+.deploy-row {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 18px;
+  align-items: center;
+}
+
+.deploy-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.deploy-line b {
+  font-size: 20px;
+  color: #fff;
+}
+
+.deploy-spec {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.deploy-note {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.upgrade {
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: rgba(0, 229, 255, 0.05);
+}
+
+.upgrade-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.upgrade-head b {
+  color: var(--cyan);
+}
+
+.upgrade ul {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: #c3d6e8;
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+
+.deploy-ok {
+  border: 1px solid rgba(57, 255, 136, 0.25);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #8df5b8;
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 800px) {
+  .deploy-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 700px) {
