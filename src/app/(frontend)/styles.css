@@ -893,7 +893,7 @@ h2 {
 .subs-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .sub-card {
