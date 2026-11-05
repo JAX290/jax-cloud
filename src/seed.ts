@@ -101,11 +101,11 @@ async function main() {
     await payload.create({
       collection: 'services',
       data: {
-        title: '独立部署 · 基础环境',
+        title: '合用部署 · 基础环境',
         customer: customer.id,
-        plan: 'deploy-independent',
+        plan: 'deploy-shared',
         spec: '2核2G / 2000G 流量',
-        price: 388,
+        price: 288,
         cycle: 'one-time',
         status: 'active',
         serverIp: '203.0.113.10',
@@ -150,6 +150,11 @@ async function main() {
 
   for (const service of allServices.docs as any[]) {
     const patch: Record<string, any> = {}
+    if (service.plan === 'deploy-independent' && service.title === '独立部署 · 基础环境') {
+      patch.plan = 'deploy-shared'
+      patch.title = '合用部署 · 基础环境'
+      patch.price = 288
+    }
     if (!service.startedAt) {
       patch.startedAt = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     }
