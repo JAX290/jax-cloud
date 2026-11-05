@@ -65,7 +65,7 @@ TMP_DIR="$(mktemp -d)"
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-echo "==> 1/5 备份"
+echo "==> 1/6 备份"
 if [ "$DO_BACKUP" = "1" ]; then
   mkdir -p "$BACKUP_DIR"
   BACKUP_FILE="$BACKUP_DIR/jax-$(date +%Y%m%d-%H%M%S).tar.gz"
@@ -77,7 +77,7 @@ else
   echo "    已跳过"
 fi
 
-echo "==> 2/5 下载最新代码"
+echo "==> 2/6 下载最新代码"
 if [ -n "${GITHUB_TOKEN:-}" ]; then
   curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
     "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/tarball/$REPO_BRANCH" \
@@ -92,7 +92,7 @@ fi
 tar -xzf "$TMP_DIR/src.tar.gz" -C "$TMP_DIR" --strip-components=1
 echo "    $REPO_OWNER/$REPO_NAME#$REPO_BRANCH"
 
-echo "==> 3/5 同步源码（保留 data / media / .env）"
+echo "==> 3/6 同步源码（保留 data / media / .env）"
 if ! command -v rsync >/dev/null 2>&1; then
   apt-get update -qq
   DEBIAN_FRONTEND=noninteractive apt-get install -y rsync
@@ -104,16 +104,27 @@ rsync -a --delete \
   --exclude .git \
   "$TMP_DIR"/ "$APP_DIR"/
 
-echo "==> 4/5 重建并启动"
+echo "==> 4/6 构建镜像"
 cd "$APP_DIR"
 COMPOSE="docker compose"
 if ! docker compose version >/dev/null 2>&1; then
   COMPOSE="docker-compose"
 fi
-$COMPOSE -f docker-compose.tailscale.yml up -d --build
+$COMPOSE -f docker-compose.tailscale.yml build
+
+echo "==> 5/6 同步数据库结构"
+$COMPOSE -f docker-compose.tailscale.yml stop app || true
+if ! $COMPOSE -f docker-compose.tailscale.yml run --rm -e NODE_ENV=development app \
+  node_modules/.bin/tsx src/migrate.ts; then
+  echo "数据库结构同步失败，尝试恢复旧容器"
+  $COMPOSE -f docker-compose.tailscale.yml up -d app || true
+  exit 1
+fi
+
+$COMPOSE -f docker-compose.tailscale.yml up -d
 $COMPOSE -f docker-compose.tailscale.yml ps
 
-echo "==> 5/5 健康检查"
+echo "==> 6/6 健康检查"
 TS_IP="$(tailscale ip -4 2>/dev/null | head -n1 || true)"
 if [ -z "$TS_IP" ]; then
   echo "    无法获取 Tailscale IP，跳过 HTTP 检查"
