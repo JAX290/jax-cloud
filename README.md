@@ -130,14 +130,32 @@ ufw disable
 
 ## 更新代码
 
+服务器上执行：
+
 ```bash
-cd /opt/jax-cloud
-git pull            # 或重新下载
-docker compose -f docker-compose.tailscale.yml up -d --build
+bash /opt/jax-cloud/update.sh
 ```
 
-> 代码目录不是 git 仓库（脚本是下载 tar 包），更新可以重新跑一遍 `install.sh`，
-> 会保留 `data/`、`media/` 和 `.env`。
+也可以远程一条命令（不需要先登录服务器）：
+
+```bash
+curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/update.sh | bash
+```
+
+脚本会自动：
+
+1. 备份 `data/`、`media/`、`.env` 到 `/root/jax-backups`（保留最近 5 份）
+2. 下载 GitHub 最新代码
+3. 同步源码，**保留** `data/`、`media/`、`.env`
+4. `docker compose up -d --build`
+5. 健康检查
+
+更新前想手动备份也可以：
+
+```bash
+cd /opt/jax-cloud
+tar -czf /root/jax-backup-$(date +%F).tar.gz data media .env
+```
 
 ## 数据
 
@@ -158,6 +176,7 @@ Dockerfile
 docker-compose.tailscale.yml Tailscale 专用（只绑 Tailscale IP）
 docker-compose.yml           可选：公网 Caddy 模式
 install.sh                   一键部署脚本
+update.sh                    更新脚本（备份 + 拉代码 + 重建）
 ```
 
 ## 邮件
