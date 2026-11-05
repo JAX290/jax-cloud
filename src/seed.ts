@@ -94,7 +94,7 @@ async function main() {
   const services = await payload.find({
     collection: 'services',
     where: { customer: { equals: customer.id } },
-    limit: 1,
+    limit: 20,
   })
 
   if (!services.docs.length) {
@@ -125,6 +125,46 @@ async function main() {
         serverIp: '203.0.113.10',
       },
     })
+  }
+
+  const OPS_CONTENT = [
+    '2核2G 独立资源，2000G 月流量',
+    '系统与运行环境维护',
+    '7×24 监控与告警',
+    '故障响应与工单支持',
+    '每月系统更新与巡检',
+  ].join('\n')
+
+  const DEPLOY_CONTENT = [
+    '系统初始化与安全加固',
+    '运行环境配置',
+    '域名解析与上线验收',
+    '交付账号与操作说明',
+  ].join('\n')
+
+  const allServices = await payload.find({
+    collection: 'services',
+    where: { customer: { equals: customer.id } },
+    limit: 20,
+  })
+
+  for (const service of allServices.docs as any[]) {
+    const patch: Record<string, any> = {}
+    if (!service.startedAt) {
+      patch.startedAt = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    if (!service.subscriptionContent) {
+      patch.subscriptionContent = String(service.plan).startsWith('ops') ? OPS_CONTENT : DEPLOY_CONTENT
+    }
+    if (!service.renewalMonthlyPrice && service.cycle === 'monthly') {
+      patch.renewalMonthlyPrice = service.price || 120
+    }
+    if (!service.expiresAt && service.cycle === 'monthly') {
+      patch.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    if (Object.keys(patch).length) {
+      await payload.update({ collection: 'services', id: service.id, data: patch as any })
+    }
   }
 
   const tickets = await payload.find({
