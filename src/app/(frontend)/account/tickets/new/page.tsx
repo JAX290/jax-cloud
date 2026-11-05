@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function NewTicketPage() {
   const [form, setForm] = useState({
@@ -12,6 +12,18 @@ export default function NewTicketPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const subject = params.get('subject')
+    if (subject) {
+      setForm((prev) => ({
+        ...prev,
+        subject,
+        category: subject.includes('升级') ? 'deploy' : prev.category,
+      }))
+    }
+  }, [])
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
