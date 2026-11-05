@@ -147,8 +147,9 @@ curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/
 1. 备份 `data/`、`media/`、`.env` 到 `/root/jax-backups`（保留最近 5 份）
 2. 下载 GitHub 最新代码
 3. 同步源码，**保留** `data/`、`media/`、`.env`
-4. `docker compose up -d --build`
-5. 健康检查
+4. 构建新镜像
+5. 自动同步数据库结构（新增字段不需要手动迁移）
+6. 启动并健康检查
 
 更新前想手动备份也可以：
 
