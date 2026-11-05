@@ -14,18 +14,27 @@
 - 勾选 **Reusable**、**Pre-approved**
 - 建议打标签 `tag:server`
 
-然后在一台**全新 Debian 12/13** 服务器上以 root 执行：
+然后以 **root** 登录全新 Debian 12/13 服务器，执行**一条命令**：
 
 ```bash
-curl -fsSL -H "Accept: application/vnd.github.raw" \
-  https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | \
-  sudo bash -s -- --authkey tskey-auth-xxxxxxxxxxxx
+apt-get update -qq && apt-get install -y -qq curl ca-certificates && curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | bash
 ```
 
-> 部分网络访问 `raw.githubusercontent.com` 会失败，所以这里走 GitHub API 取脚本；
-> 如果 API 也限流，用下面的 clone 方式。
+运行后会提示：
 
-也可以克隆仓库后执行：
+```
+请输入 Tailscale Auth Key:
+```
+
+把生成的 `tskey-auth-...` 粘进去回车即可，其余全自动。
+
+如果不想交互，也可以把 key 直接带上（还是一条命令）：
+
+```bash
+apt-get update -qq && apt-get install -y -qq curl ca-certificates && curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | bash -s -- --authkey tskey-auth-xxxxxxxxxxxx
+```
+
+也可以克隆仓库后执行（key 作为参数）：
 
 ```bash
 git clone https://github.com/JAX290/jax-cloud.git

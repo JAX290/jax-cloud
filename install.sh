@@ -72,13 +72,20 @@ fi
 
 if ! tailscale ip -4 >/dev/null 2>&1; then
   if [ -z "$TS_AUTHKEY" ]; then
-    if [ -t 0 ]; then
+    if [ -r /dev/tty ]; then
+      read -rsp "请输入 Tailscale Auth Key: " TS_AUTHKEY < /dev/tty || true
+      printf "\n" > /dev/tty
+    elif [ -t 0 ]; then
       read -rsp "请输入 Tailscale Auth Key: " TS_AUTHKEY
       echo
     else
       echo "缺少 Tailscale Auth Key，请用 --authkey 或 TS_AUTHKEY 传入"
       exit 1
     fi
+  fi
+  if [ -z "$TS_AUTHKEY" ]; then
+    echo "Auth Key 不能为空"
+    exit 1
   fi
   tailscale up --authkey "$TS_AUTHKEY" --ssh --hostname "$TS_HOSTNAME" --accept-dns=false
 fi
