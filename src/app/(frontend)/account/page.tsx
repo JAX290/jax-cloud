@@ -217,9 +217,11 @@ export default async function AccountPage() {
                       <div className="deploy-spec">
                         {service.spec || '—'}
                         {service.startedAt ? ` · 开通于 ${formatDate(service.startedAt)}` : ''}
-                        {service.serverIp ? ` · ${service.serverIp}` : ''}
                       </div>
-                      <div className="deploy-note">部署费用已一次性支付，此服务不再产生续费。</div>
+                      <div className="deploy-note">一次部署、长期有效。</div>
+                      <div className="deploy-note">
+                        订阅服务到期之后，将为您备份数据 30 天；有效期内重新订阅，无需部署费。
+                      </div>
                     </div>
 
                     {shared ? (
