@@ -131,6 +131,9 @@ export const Services: CollectionConfig = {
       name: 'notes',
       type: 'textarea',
       label: '备注（仅后台可见）',
+      access: {
+        read: ({ req: { user } }: any) => isAdmin(user),
+      },
     },
   ],
 }
