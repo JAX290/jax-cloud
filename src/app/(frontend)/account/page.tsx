@@ -20,8 +20,8 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const PLAN_LABEL: Record<string, string> = {
-  'deploy-independent': '独立部署',
-  'deploy-shared': '合用部署',
+  'deploy-independent': '独享线路',
+  'deploy-shared': '共享线路',
   'ops-1c1g': '运维托管 · 1核1G',
   'ops-2c2g': '运维托管 · 2核2G',
   'ops-4c4g': '运维托管 · 4核4G',
@@ -76,6 +76,13 @@ export default async function AccountPage() {
     }),
   ])
 
+  const deployServices = services.docs.filter((service: any) =>
+    String(service.plan || '').startsWith('deploy'),
+  )
+  const monthlyServices = services.docs.filter(
+    (service: any) => !String(service.plan || '').startsWith('deploy'),
+  )
+
   return (
     <div className="page">
       <div className="wrap">
@@ -99,12 +106,12 @@ export default async function AccountPage() {
           <section className="panel">
             <div className="panel-head">
               <h2>我的订阅</h2>
-              <span className="muted">当前服务、到期时间与续费价格</span>
+              <span className="muted">按月服务、到期时间与续费价格</span>
             </div>
 
-            {services.docs.length ? (
+            {monthlyServices.length ? (
               <div className="subs-grid">
-                {services.docs.map((service: any) => {
+                {monthlyServices.map((service: any) => {
                   const remaining = daysLeft(service.expiresAt)
                   const isExpired = service.status === 'expired' || (remaining !== null && remaining < 0)
                   const monthly = Number(
@@ -177,7 +184,7 @@ export default async function AccountPage() {
                             : '一次性交付服务，无需续费。'}
                         </span>
                         {monthly > 0 ? (
-                          <Link className="btn btn-ghost" href="/account/tickets/new">
+                          <Link className="btn btn-ghost" href="/account/tickets/new?subject=申请续费">
                             申请续费
                           </Link>
                         ) : null}
@@ -187,9 +194,60 @@ export default async function AccountPage() {
                 })}
               </div>
             ) : (
-              <div className="empty">还没有服务。联系客服开通后会显示在这里。</div>
+              <div className="empty">还没有按月订阅。联系客服开通后会显示在这里。</div>
             )}
           </section>
+
+          {deployServices.length ? (
+            <section className="panel">
+              <div className="panel-head">
+                <h2>部署线路</h2>
+                <span className="muted">一次性付费，已部署完成，无需续费</span>
+              </div>
+
+              {deployServices.map((service: any) => {
+                const shared = service.plan === 'deploy-shared'
+                return (
+                  <div className="deploy-row" key={service.id}>
+                    <div className="deploy-main">
+                      <div className="deploy-line">
+                        <b>{shared ? '共享线路已部署' : '独享线路已部署'}</b>
+                        <span className="status active">正常</span>
+                      </div>
+                      <div className="deploy-spec">
+                        {service.spec || '—'}
+                        {service.startedAt ? ` · 开通于 ${formatDate(service.startedAt)}` : ''}
+                        {service.serverIp ? ` · ${service.serverIp}` : ''}
+                      </div>
+                      <div className="deploy-note">部署费用已一次性支付，此服务不再产生续费。</div>
+                    </div>
+
+                    {shared ? (
+                      <div className="upgrade">
+                        <div className="upgrade-head">
+                          <span>升级独享线路</span>
+                          <b>+¥100</b>
+                        </div>
+                        <ul>
+                          <li>更多流量</li>
+                          <li>纯独立服务器</li>
+                          <li>更高设备上限</li>
+                        </ul>
+                        <Link
+                          className="btn btn-primary"
+                          href="/account/tickets/new?subject=升级独享线路"
+                        >
+                          申请升级
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="deploy-ok">已是独享线路</div>
+                    )}
+                  </div>
+                )
+              })}
+            </section>
+          ) : null}
 
           <section className="panel">
             <div className="panel-head">
