@@ -35,7 +35,7 @@ usage() {
   bash install.sh --authkey tskey-auth-xxxx [选项]
 
 选项：
-  --authkey KEY       Tailscale Auth Key（也可用环境变量 TS_AUTHKEY）
+  --authkey KEY       Tailscale Auth Key（可选；不填则走浏览器登录）
   --hostname NAME     Tailscale 设备名，默认 jax-cloud
   --app-dir DIR       安装目录，默认 /opt/jax-cloud
   --no-firewall       不开启 ufw（调试用）
@@ -71,23 +71,13 @@ if ! command -v tailscale >/dev/null 2>&1; then
 fi
 
 if ! tailscale ip -4 >/dev/null 2>&1; then
-  if [ -z "$TS_AUTHKEY" ]; then
-    if [ -r /dev/tty ]; then
-      read -rsp "请输入 Tailscale Auth Key: " TS_AUTHKEY < /dev/tty || true
-      printf "\n" > /dev/tty
-    elif [ -t 0 ]; then
-      read -rsp "请输入 Tailscale Auth Key: " TS_AUTHKEY
-      echo
-    else
-      echo "缺少 Tailscale Auth Key，请用 --authkey 或 TS_AUTHKEY 传入"
-      exit 1
-    fi
+  if [ -n "$TS_AUTHKEY" ]; then
+    tailscale up --authkey "$TS_AUTHKEY" --ssh --hostname "$TS_HOSTNAME" --accept-dns=false
+  else
+    echo "    未提供 Auth Key，使用浏览器登录模式"
+    echo "    下面会输出一个登录链接，复制到浏览器打开并确认即可"
+    tailscale up --ssh --hostname "$TS_HOSTNAME" --accept-dns=false
   fi
-  if [ -z "$TS_AUTHKEY" ]; then
-    echo "Auth Key 不能为空"
-    exit 1
-  fi
-  tailscale up --authkey "$TS_AUTHKEY" --ssh --hostname "$TS_HOSTNAME" --accept-dns=false
 fi
 
 TS_IP=""

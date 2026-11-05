@@ -8,38 +8,34 @@
 
 ## 一键部署（全新 Debian 12/13）
 
-在 Tailscale 管理后台生成一个 Auth Key：
-
-- Settings → Keys → Generate auth key
-- 勾选 **Reusable**、**Pre-approved**
-- 建议打标签 `tag:server`
-
-然后以 **root** 登录全新 Debian 12/13 服务器，执行**一条命令**：
+不需要提前生成 key。以 **root** 登录全新服务器，执行**一条命令**：
 
 ```bash
 apt-get update -qq && apt-get install -y -qq curl ca-certificates && curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | bash
 ```
 
-运行后会提示：
+运行后 Tailscale 会输出一个登录链接：
 
 ```
-请输入 Tailscale Auth Key:
+To authenticate, visit:
+https://login.tailscale.com/a/xxxxxxxx
 ```
 
-把生成的 `tskey-auth-...` 粘进去回车即可，其余全自动。
+把这个链接复制到浏览器（手机或电脑都行），用你的 Tailscale 账号登录并点 **Confirm**。
+终端会自动继续，后面全自动完成。
 
-如果不想交互，也可以把 key 直接带上（还是一条命令）：
+> 如果想无人值守安装，也可以提前生成 Auth Key 带上（一条命令）：
+>
+> ```bash
+> apt-get update -qq && apt-get install -y -qq curl ca-certificates && curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | bash -s -- --authkey tskey-auth-xxxxxxxxxxxx
+> ```
 
-```bash
-apt-get update -qq && apt-get install -y -qq curl ca-certificates && curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | bash -s -- --authkey tskey-auth-xxxxxxxxxxxx
-```
-
-也可以克隆仓库后执行（key 作为参数）：
+也可以 clone 后执行：
 
 ```bash
 git clone https://github.com/JAX290/jax-cloud.git
 cd jax-cloud
-sudo bash install.sh --authkey tskey-auth-xxxxxxxxxxxx
+sudo bash install.sh
 ```
 
 脚本会依次完成：
