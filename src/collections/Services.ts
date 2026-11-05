@@ -12,7 +12,7 @@ export const Services: CollectionConfig = {
   admin: {
     useAsTitle: 'title',
     group: '客户',
-    defaultColumns: ['title', 'customer', 'status', 'expiresAt'],
+    defaultColumns: ['title', 'customer', 'plan', 'status', 'expiresAt', 'renewalMonthlyPrice'],
   },
   access: {
     read: ({ req: { user } }: any) => {
@@ -85,6 +85,32 @@ export const Services: CollectionConfig = {
       ],
       defaultValue: 'active',
       required: true,
+    },
+    {
+      name: 'startedAt',
+      type: 'date',
+      label: '开通时间',
+      admin: {
+        date: {
+          pickerAppearance: 'dayOnly',
+        },
+      },
+    },
+    {
+      name: 'subscriptionContent',
+      type: 'textarea',
+      label: '订阅内容（客户可见）',
+      admin: {
+        description: '每行一条，客户后台会按条目展示。这里是核心交付内容。',
+      },
+    },
+    {
+      name: 'renewalMonthlyPrice',
+      type: 'number',
+      label: '续费月价（元）',
+      admin: {
+        description: '客户后台显示；续费 12 个月按 9 折自动计算。',
+      },
     },
     {
       name: 'expiresAt',
