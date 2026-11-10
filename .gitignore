@@ -52,3 +52,13 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# 运行期目录（备份/密钥/生成配置）
+/backups/
+/backup-secrets/
+/caddy-nodes/
+/caddy-snippets/
+/dev-emails/
+/.tmp-test/
+/*.db.bak
+
