@@ -70,6 +70,7 @@ export interface Config {
   collections: {
     users: User;
     customers: Customer;
+    'email-codes': EmailCode;
     media: Media;
     services: Service;
     tickets: Ticket;
@@ -86,6 +87,7 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
+    'email-codes': EmailCodesSelect<false> | EmailCodesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     services: ServicesSelect<false> | ServicesSelect<true>;
     tickets: TicketsSelect<false> | TicketsSelect<true>;
@@ -200,6 +202,7 @@ export interface Customer {
   trialNodeId?: number | null;
   trialSubId?: string | null;
   trialExpiresAt?: string | null;
+  emailCode?: string | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -219,6 +222,23 @@ export interface Customer {
     | null;
   password?: string | null;
   collection: 'customers';
+}
+/**
+ * 注册/重置密码的验证码记录，只存哈希，不存明文
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "email-codes".
+ */
+export interface EmailCode {
+  id: number;
+  email: string;
+  codeHash: string;
+  purpose?: ('register' | 'reset') | null;
+  expiresAt?: string | null;
+  usedAt?: string | null;
+  attempts?: number | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -483,6 +503,10 @@ export interface PayloadLockedDocument {
         value: number | Customer;
       } | null)
     | ({
+        relationTo: 'email-codes';
+        value: number | EmailCode;
+      } | null)
+    | ({
         relationTo: 'media';
         value: number | Media;
       } | null)
@@ -601,6 +625,7 @@ export interface CustomersSelect<T extends boolean = true> {
   trialNodeId?: T;
   trialSubId?: T;
   trialExpiresAt?: T;
+  emailCode?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -618,6 +643,20 @@ export interface CustomersSelect<T extends boolean = true> {
         createdAt?: T;
         expiresAt?: T;
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "email-codes_select".
+ */
+export interface EmailCodesSelect<T extends boolean = true> {
+  email?: T;
+  codeHash?: T;
+  purpose?: T;
+  expiresAt?: T;
+  usedAt?: T;
+  attempts?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

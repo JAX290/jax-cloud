@@ -1,6 +1,8 @@
-import type { CollectionConfig } from 'payload'
+import { APIError, type CollectionConfig } from 'payload'
 
 import { nextCustomerNo } from '../lib/customerNo'
+import { renderMail } from '../lib/mail-templates'
+import { consumeCode } from '../lib/verify-code'
 
 const isAdmin = (user: any) => user?.collection === 'users'
 const isCustomer = (user: any) => user?.collection === 'customers'
@@ -33,12 +35,55 @@ export const Customers: CollectionConfig = {
     },
   },
   hooks: {
+    // 注册必须带邮箱验证码（后台管理员创建不受限）
+    beforeValidate: [
+      async ({ data, operation, req }: any) => {
+        if (operation !== 'create') return data
+        const isAdminUser = req?.user?.collection === 'users'
+        if (isAdminUser) return data
+        const result = await consumeCode(req.payload, data?.email, 'register', data?.emailCode)
+        if (!result.ok) {
+          throw new APIError(result.error || '请先获取邮箱验证码', 400)
+        }
+        delete data.emailCode
+        return data
+      },
+    ],
     beforeChange: [
       async ({ data, operation, req }: any) => {
         if (operation === 'create' && !data.customerNo) {
           data.customerNo = await nextCustomerNo(req.payload)
         }
         return data
+      },
+    ],
+    afterChange: [
+      // 注册成功后发一封欢迎邮件（失败不影响注册）
+      async ({ doc, operation, req }: any) => {
+        if (operation !== 'create' || !doc?.email) return
+        try {
+          const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
+          await req.payload.sendEmail({
+            to: doc.email,
+            subject: '欢迎使用 JAX CLOUD',
+            html: renderMail({
+              title: '账号已创建',
+              body: `
+                <p>你好${doc.name ? `，${doc.name}` : ''}：</p>
+                <p>你的 JAX CLOUD 账号已创建成功，客户编号 <b>#${doc.customerNo || ''}</b>。</p>
+                <p>接下来可以：</p>
+                <ul style="padding-left:20px;margin:10px 0">
+                  <li>在账户页领取 <b>1 小时免费体验</b>（1 小时 / 1G 流量）</li>
+                  <li>需要正式环境时，直接在账户页下单或找客服</li>
+                </ul>
+              `,
+              cta: { label: '进入我的账户', url: `${site}/account` },
+              footerNote: '如果这不是你本人注册，直接忽略这封邮件即可。',
+            }),
+          })
+        } catch {
+          /* 邮件失败不影响注册 */
+        }
       },
     ],
   },
@@ -125,6 +170,13 @@ export const Customers: CollectionConfig = {
       type: 'date',
       label: '体验到期时间',
       admin: { position: 'sidebar', readOnly: true },
+    },
+    {
+      // 注册时前端传的邮箱验证码：虚拟字段，不落库，只在 beforeValidate 里校验
+      name: 'emailCode',
+      type: 'text',
+      virtual: true,
+      admin: { hidden: true },
     },
   ],
 }

@@ -8,6 +8,7 @@ import sharp from 'sharp'
 
 import { Cases } from './collections/Cases'
 import { Customers } from './collections/Customers'
+import { EmailCodes } from './collections/EmailCodes'
 import { Media } from './collections/Media'
 import { Nodes } from './collections/Nodes'
 import { Posts } from './collections/Posts'
@@ -34,7 +35,7 @@ export default buildConfig({
       titleSuffix: ' · JAX CLOUD',
     },
   },
-  collections: [Users, Customers, Media, Services, Tickets, Cases, Posts, Orders, Nodes],
+  collections: [Users, Customers, EmailCodes, Media, Services, Tickets, Cases, Posts, Orders, Nodes],
   globals: [SiteSettings],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'dev-secret-change-me',

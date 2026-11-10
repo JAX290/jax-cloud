@@ -1,45 +1,80 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', code: '' })
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [confirming, setConfirming] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
 
-  function submit(event: React.FormEvent) {
+  // 发送验证码后的倒计时
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = setTimeout(() => setCooldown((n) => n - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [cooldown])
+
+  async function sendCode() {
+    setError('')
+    setNotice('')
+    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError('先填一个正确的邮箱')
+      return
+    }
+    setSending(true)
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, purpose: 'register' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) throw new Error(data.error || '发送失败，稍后再试')
+      setNotice('验证码已发到你的邮箱，10 分钟内有效（找不到就看下垃圾箱）')
+      setCooldown(60)
+    } catch (err: any) {
+      setError(err.message || '发送失败')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function submit(event: React.FormEvent) {
     event.preventDefault()
     setError('')
-
     if (!form.email || !form.password) {
       setError('请填写邮箱和密码')
       return
     }
+    if (!/^\d{6}$/.test(form.code)) {
+      setError('请填写邮箱里收到的 6 位验证码')
+      return
+    }
 
-    setConfirming(true)
-  }
-
-  async function doRegister() {
     setLoading(true)
-    setError('')
     try {
       const response = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          emailCode: form.code,
+        }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
         throw new Error(data?.errors?.[0]?.message || data?.message || '注册失败，请稍后重试')
       }
-      setConfirming(false)
       setDone(true)
     } catch (err: any) {
       setError(err.message || '注册失败')
-      setConfirming(false)
     } finally {
       setLoading(false)
     }
@@ -54,7 +89,7 @@ export default function RegisterPage() {
             账号已创建，请使用 <b>{form.email}</b> 和密码登录。
           </p>
           <div className="alert alert-warn">
-            请确认邮箱正确！否则无法通过邮箱找回账号。
+            欢迎邮件已发出，里面写了下一步怎么领 1 小时免费体验。
           </div>
           <Link className="btn btn-primary btn-block" href="/login">
             去登录
@@ -68,13 +103,10 @@ export default function RegisterPage() {
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
         <h1>注册账户</h1>
-        <p className="sub">用邮箱注册，注册后即可登录查看服务、提交工单。</p>
-
-        <div className="alert alert-warn">
-          请确认邮箱正确！否则无法通过邮箱找回账号。
-        </div>
+        <p className="sub">用邮箱注册，注册后即可领取体验、查看服务、提交工单。</p>
 
         {error ? <div className="alert alert-error">{error}</div> : null}
+        {notice ? <div className="alert alert-success">{notice}</div> : null}
 
         <div className="field">
           <label htmlFor="name">称呼</label>
@@ -86,6 +118,7 @@ export default function RegisterPage() {
             autoComplete="name"
           />
         </div>
+
         <div className="field">
           <label htmlFor="email">邮箱 *</label>
           <input
@@ -98,6 +131,33 @@ export default function RegisterPage() {
             autoComplete="email"
           />
         </div>
+
+        <div className="field">
+          <label htmlFor="code">邮箱验证码 *</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              id="code"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={form.code}
+              onChange={(event) => setForm({ ...form, code: event.target.value.replace(/\D/g, '') })}
+              placeholder="6 位数字"
+              autoComplete="one-time-code"
+              style={{ flex: 1 }}
+            />
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={sendCode}
+              disabled={sending || cooldown > 0}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {sending ? '发送中…' : cooldown > 0 ? `${cooldown}s 后重发` : '发送验证码'}
+            </button>
+          </div>
+        </div>
+
         <div className="field">
           <label htmlFor="password">密码 *</label>
           <input
@@ -120,28 +180,6 @@ export default function RegisterPage() {
           已有账户？<Link href="/login">直接登录</Link>
         </div>
       </form>
-
-      {confirming ? (
-        <div className="confirm-mask" role="dialog" aria-modal="true">
-          <div className="confirm-box">
-            <h3>请确认邮箱正确</h3>
-            <p>
-              你的登录邮箱是：<b className="confirm-email">{form.email}</b>
-            </p>
-            <p>
-              邮箱填错将无法通过邮箱找回账号，请务必确认无误后再注册。
-            </p>
-            <div className="confirm-actions">
-              <button className="btn btn-ghost" onClick={() => setConfirming(false)} type="button">
-                返回修改
-              </button>
-              <button className="btn btn-primary" onClick={doRegister} disabled={loading} type="button">
-                {loading ? '注册中…' : '确认注册'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }
