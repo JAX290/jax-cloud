@@ -98,6 +98,39 @@ export async function GET(req: Request) {
         overrideAccess: true,
       })
       expiredOrders += 1
+
+      // 通知客户订单已关闭（避免"我付了钱怎么没单"）
+      try {
+        const custId = typeof o.customer === 'object' ? o.customer?.id : o.customer
+        const cust: any = custId
+          ? await payload.findByID({ collection: 'customers', id: custId, depth: 0, overrideAccess: true })
+          : null
+        if (cust?.email) {
+          const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
+          await sendMail(payload, {
+            to: cust.email,
+            type: 'order_cancelled',
+            customerId: cust.id,
+            dedupeKey: `expired-${o.id}`,
+            subject: '订单因超时已关闭',
+            html: renderMail({
+              title: '订单已关闭',
+              body: `
+                <p>你好${cust.name ? `，${cust.name}` : ''}：</p>
+                <p>你的订单 <b>${o.orderNo || ''}</b>（¥${o.amount || 0}）超过 ${PENDING_TTL_HOURS} 小时没有完成付款，已经自动关闭。</p>
+                <p>如果还想开通，重新下单就行；已经付过款的话直接找客服，我们给你补上。</p>
+              `,
+              cta: { label: '重新下单', url: `${site}/#pricing` },
+            }),
+            text: renderMailText({
+              title: '订单已关闭',
+              lines: [`订单号：${o.orderNo || ''}`, `金额：¥${o.amount || 0}`, '超时未付款，已自动关闭'],
+            }),
+          })
+        }
+      } catch {
+        /* 邮件失败不影响订单状态 */
+      }
     }
   } catch (e: any) {
     console.error('[cron] order expire failed:', e?.message || e)

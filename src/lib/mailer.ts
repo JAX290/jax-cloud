@@ -27,8 +27,16 @@ export type MailType =
   | 'order_cancelled'
   | 'password_changed'
 
-/** 关键邮件：不受每日上限限制（但受全站上限的部分保护策略影响最小） */
-const CRITICAL: MailType[] = ['verify_code', 'order_active', 'renew_success', 'expiry_day', 'sub_reset']
+/** 关键邮件：不受每日上限限制（钱和账号安全相关） */
+const CRITICAL: MailType[] = [
+  'verify_code',
+  'order_active',
+  'renew_success',
+  'expiry_day',
+  'sub_reset',
+  'order_cancelled',
+  'password_changed',
+]
 
 const DAILY_PER_USER = Number(process.env.MAIL_DAILY_PER_USER || 3)
 const DAILY_TOTAL = Number(process.env.MAIL_DAILY_TOTAL || 300)

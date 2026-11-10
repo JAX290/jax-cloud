@@ -146,7 +146,7 @@ async function provisionOrder(doc: any, req: any) {
             to: cust.email,
             type: 'renew_success',
             customerId: cust.id,
-            dedupeKey: `renew-${doc.orderNo}`,
+            dedupeKey: `renew-${doc.id}`,
             subject: `续费已生效：+${days} 天（新的到期日 ${expireText}）`,
             html: renderMail({
               title: '续费已生效',
@@ -276,7 +276,7 @@ async function provisionOrder(doc: any, req: any) {
           to: customer.email,
           type: 'order_active',
           customerId: customer.id,
-          dedupeKey: `active-${doc.orderNo}`,
+          dedupeKey: `active-${doc.id}`,
           subject: '你的网络环境已开通',
           html: renderMail({
             title: '环境已开通',
@@ -374,7 +374,7 @@ export const Orders: CollectionConfig = {
                 to: customer.email,
                 type: 'order_pending',
                 customerId: customer.id,
-                dedupeKey: `pending-${doc.orderNo}`,
+                dedupeKey: `pending-${doc.id}`,
                 subject: `订单已创建：${BILLING_LABEL[doc.billing] || '订单'} ¥${doc.amount}`,
                 html: renderMail({
                   title: '订单已创建，等待付款',
