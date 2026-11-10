@@ -3,6 +3,8 @@ import path from 'node:path'
 import { getPayload } from 'payload'
 
 import config from '@/payload.config'
+import { renderMail, renderMailText } from '@/lib/mail-templates'
+import { sendMail } from '@/lib/mailer'
 import { listNodeClients } from '@/lib/node-client'
 import { nodeCachePath, readNodeCache, writeNodeCache } from '@/lib/node-cache'
 import { GRACE_DAYS, customerNoFromEmail, daysToExpiry, paidExpiry, trafficRatio } from '@/lib/renew'
@@ -269,24 +271,95 @@ export async function GET(req: Request) {
         fs.writeFileSync(marker, new Date().toISOString())
         renewRemind.sent = true
 
-        // 到期当天给客户发邮件（宽限期提醒）；SMTP 没配就跳过
+        // 逐客户发提醒邮件（统一走发送中心：每天上限 + 3 天去重 + 全站熔断）
         if (process.env.SMTP_HOST) {
+          const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
           for (const i of items) {
-            if (i.kind !== 'expiry' || i.days === null || i.days > 0) continue
             const no = customerNoFromEmail(i.email)
             const cu = no ? byNo.get(no) : null
             if (!cu?.email) continue
+            const who = `你好${cu.name ? `，${cu.name}` : ''}：`
+
             try {
-              await payload.sendEmail({
-                to: cu.email,
-                subject: '你的环境已到期，我们为你保留了 1 天宽限期',
-                html: [
-                  `<p>你好${cu.name ? `，${cu.name}` : ''}：</p>`,
-                  `<p>你的网络环境已到期（付费到期日 ${new Date(paidExpiry(i.expiry)).toLocaleDateString('zh-CN')}）。</p>`,
-                  `<p>我们为你保留了 <b>${GRACE_DAYS} 天</b>宽限期，这期间仍可正常使用。为了不影响店铺运营，建议尽快续费。</p>`,
-                  `<p>登录 <a href="https://cloud.jax.markets/#pricing">cloud.jax.markets</a> 可以自助续费，也可以直接找客服。</p>`,
-                ].join(''),
-              })
+              if (i.kind === 'expiry' && i.days !== null) {
+                const expireText = new Date(paidExpiry(i.expiry)).toLocaleDateString('zh-CN')
+                if (i.days <= 0) {
+                  await sendMail(payload, {
+                    to: cu.email,
+                    type: 'expiry_day',
+                    customerId: no || undefined,
+                    dedupeKey: `${no}-${dateKey}-expired`,
+                    subject: '环境已到期，为你保留了 1 天宽限期',
+                    html: renderMail({
+                      title: '环境已到期',
+                      body: `<p>${who}</p><p>你的网络环境已到期（付费到期日 ${expireText}）。</p><p>我们为你保留了 <b>${GRACE_DAYS} 天</b>宽限期，这期间仍可正常使用；建议尽快续费，避免影响店铺运营。</p>`,
+                      cta: { label: '去续费', url: `${site}/#pricing` },
+                    }),
+                    text: renderMailText({
+                      title: '环境已到期',
+                      lines: [`付费到期日：${expireText}`, `宽限期：${GRACE_DAYS} 天`],
+                    }),
+                  })
+                } else if (i.days === 1) {
+                  await sendMail(payload, {
+                    to: cu.email,
+                    type: 'expiry_1d',
+                    customerId: no || undefined,
+                    dedupeKey: `${no}-${dateKey}-1d`,
+                    subject: '明天到期，记得续一下',
+                    html: renderMail({
+                      title: '明天到期',
+                      body: `<p>${who}</p><p>你的环境明天到期（${expireText}），到期后还有 ${GRACE_DAYS} 天宽限期，但建议提前续上，避免影响使用。</p>`,
+                      cta: { label: '去续费', url: `${site}/#pricing` },
+                    }),
+                    text: renderMailText({ title: '明天到期', lines: [`到期日：${expireText}`] }),
+                  })
+                } else if (i.days === 7) {
+                  await sendMail(payload, {
+                    to: cu.email,
+                    type: 'expiry_7d',
+                    customerId: no || undefined,
+                    dedupeKey: `${no}-${dateKey}-7d`,
+                    subject: '环境还有 7 天到期',
+                    html: renderMail({
+                      title: '环境还有 7 天到期',
+                      body: `<p>${who}</p><p>你的环境将在 ${expireText} 到期。可以现在续，也可以等快到期再续（时长会累加）。</p>`,
+                      cta: { label: '查看套餐', url: `${site}/#pricing` },
+                    }),
+                    text: renderMailText({ title: '环境还有 7 天到期', lines: [`到期日：${expireText}`] }),
+                  })
+                }
+              } else if (i.kind === 'traffic') {
+                if (i.ratio >= 0.9) {
+                  await sendMail(payload, {
+                    to: cu.email,
+                    type: 'traffic_90',
+                    customerId: no || undefined,
+                    dedupeKey: `${no}-${dateKey}-traffic90`,
+                    subject: '流量快用完了（已用 90%）',
+                    html: renderMail({
+                      title: '流量快用完了',
+                      body: `<p>${who}</p><p>你的流量已经用了约 <b>${Math.round(i.ratio * 100)}%</b>，用完会断网。可以加个加油包，或者等下个周期刷新。</p>`,
+                      cta: { label: '去加流量', url: `${site}/#pricing` },
+                    }),
+                    text: renderMailText({ title: '流量快用完了', lines: [`已用 ${Math.round(i.ratio * 100)}%`] }),
+                  })
+                } else if (i.ratio >= 0.8) {
+                  await sendMail(payload, {
+                    to: cu.email,
+                    type: 'traffic_80',
+                    customerId: no || undefined,
+                    dedupeKey: `${no}-${dateKey}-traffic80`,
+                    subject: '流量用了 80% 了',
+                    html: renderMail({
+                      title: '流量用了 80%',
+                      body: `<p>${who}</p><p>提醒一下：你的流量已经用了约 <b>${Math.round(i.ratio * 100)}%</b>，如果这个月还要大量用，可以提前加流量。</p>`,
+                      cta: { label: '查看加油包', url: `${site}/#pricing` },
+                    }),
+                    text: renderMailText({ title: '流量用了 80%', lines: [`已用 ${Math.round(i.ratio * 100)}%`] }),
+                  })
+                }
+              }
             } catch (mailErr: any) {
               console.error('[cron] customer email failed:', mailErr?.message || mailErr)
             }

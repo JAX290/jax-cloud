@@ -2,6 +2,7 @@ import { APIError, type CollectionConfig } from 'payload'
 
 import { nextCustomerNo } from '../lib/customerNo'
 import { renderMail } from '../lib/mail-templates'
+import { sendMail } from '../lib/mailer'
 import { consumeCode } from '../lib/verify-code'
 
 const isAdmin = (user: any) => user?.collection === 'users'
@@ -58,13 +59,16 @@ export const Customers: CollectionConfig = {
       },
     ],
     afterChange: [
-      // 注册成功后发一封欢迎邮件（失败不影响注册）
+      // 注册成功后发一封欢迎邮件（走发送中心，统一记日志和限流）
       async ({ doc, operation, req }: any) => {
         if (operation !== 'create' || !doc?.email) return
         try {
           const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
-          await req.payload.sendEmail({
+          await sendMail(req.payload, {
             to: doc.email,
+            type: 'welcome',
+            customerId: doc.id,
+            dedupeKey: `welcome-${doc.id}`,
             subject: '欢迎使用 JAX CLOUD',
             html: renderMail({
               title: '账号已创建',

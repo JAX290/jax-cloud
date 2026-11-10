@@ -10,6 +10,7 @@ import { Captchas } from './collections/Captchas'
 import { Cases } from './collections/Cases'
 import { Customers } from './collections/Customers'
 import { EmailCodes } from './collections/EmailCodes'
+import { MailLogs } from './collections/MailLogs'
 import { Media } from './collections/Media'
 import { Nodes } from './collections/Nodes'
 import { Posts } from './collections/Posts'
@@ -36,7 +37,7 @@ export default buildConfig({
       titleSuffix: ' · JAX CLOUD',
     },
   },
-  collections: [Users, Customers, EmailCodes, Captchas, Media, Services, Tickets, Cases, Posts, Orders, Nodes],
+  collections: [Users, Customers, EmailCodes, Captchas, MailLogs, Media, Services, Tickets, Cases, Posts, Orders, Nodes],
   globals: [SiteSettings],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'dev-secret-change-me',

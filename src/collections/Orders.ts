@@ -3,6 +3,8 @@ import type { CollectionConfig } from 'payload'
 import { listNodeClients } from '../lib/node-client'
 import { findClientNode } from '../lib/migrate'
 import { createClientOnNode, pickOnlineNode, updateClientOnNode } from '../lib/provision'
+import { renderMail, renderMailText } from '../lib/mail-templates'
+import { sendMail } from '../lib/mailer'
 import { GRACE_DAYS } from '../lib/renew'
 import { sendWecom } from '../lib/wecom'
 
@@ -130,6 +132,44 @@ async function provisionOrder(doc: any, req: any) {
       await sendWecom(
         `✅ **续费已自动生效**\n订单：${doc.orderNo}\n客户端：${renewEmail}\n节点：${found.node.name}\n增加：${days} 天 · ${doc.trafficGB || 0}G\n新到期：${new Date(newPaidExpiry).toLocaleDateString('zh-CN')}（含 ${GRACE_DAYS} 天宽限）\n总流量：${Math.round(newTotalGB / 1024 / 1024 / 1024)}G`,
       )
+
+      // 给客户发续费成功邮件（失败不影响业务）
+      try {
+        const custId = typeof doc.customer === 'object' ? doc.customer?.id : doc.customer
+        const cust: any = custId
+          ? await payload.findByID({ collection: 'customers', id: custId, depth: 0, overrideAccess: true })
+          : null
+        if (cust?.email) {
+          const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
+          const expireText = new Date(newPaidExpiry).toLocaleDateString('zh-CN')
+          await sendMail(payload, {
+            to: cust.email,
+            type: 'renew_success',
+            customerId: cust.id,
+            dedupeKey: `renew-${doc.orderNo}`,
+            subject: `续费已生效：+${days} 天（新的到期日 ${expireText}）`,
+            html: renderMail({
+              title: '续费已生效',
+              body: `
+                <p>你好${cust.name ? `，${cust.name}` : ''}：</p>
+                <p>你的续费已经自动生效，<b>订阅链接和设备都不用动</b>。</p>
+                <ul style="padding-left:20px;margin:12px 0">
+                  <li>增加时长：${days} 天</li>
+                  <li>增加流量：${doc.trafficGB || 0}G（已累加到原额度）</li>
+                  <li>新的到期日：<b>${expireText}</b>（含 ${GRACE_DAYS} 天宽限）</li>
+                </ul>
+              `,
+              cta: { label: '查看我的账户', url: `${site}/account` },
+            }),
+            text: renderMailText({
+              title: '续费已生效',
+              lines: [`增加时长：${days} 天`, `增加流量：${doc.trafficGB || 0}G`, `新的到期日：${expireText}`],
+            }),
+          })
+        }
+      } catch {
+        /* 邮件失败不影响续费 */
+      }
       return
     }
 
@@ -226,6 +266,42 @@ async function provisionOrder(doc: any, req: any) {
     await sendWecom(
       `✅ **订单已开通**\n订单：${doc.orderNo}\n节点：${node.name} (${node.ip})\n客户端：${email}\n设备：${limitIp} 台 · 流量：${doc.trafficGB || 0}G · 时长：${days} 天`,
     )
+
+    // 开通通知邮件（客户最关心：哪台节点、怎么用、什么时候到期）
+    try {
+      if (customer?.email) {
+        const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
+        const expireText = new Date(expiryTime - GRACE_DAYS * 24 * 3600 * 1000).toLocaleDateString('zh-CN')
+        await sendMail(payload, {
+          to: customer.email,
+          type: 'order_active',
+          customerId: customer.id,
+          dedupeKey: `active-${doc.orderNo}`,
+          subject: '你的网络环境已开通',
+          html: renderMail({
+            title: '环境已开通',
+            body: `
+              <p>你好${customer.name ? `，${customer.name}` : ''}：</p>
+              <p>你的环境已经开通好了，登录账户页就能看到订阅链接。</p>
+              <ul style="padding-left:20px;margin:12px 0">
+                <li>所在节点：${node.name}</li>
+                <li>设备上限：${limitIp} 台</li>
+                <li>流量额度：${doc.trafficGB || 0}G</li>
+                <li>到期日：<b>${expireText}</b></li>
+              </ul>
+              <p style="color:#6b7f92;font-size:13px">第一次用的话，在账户页复制订阅链接，导入客户端即可；不会弄可以找客服。</p>
+            `,
+            cta: { label: '查看订阅链接', url: `${site}/account` },
+          }),
+          text: renderMailText({
+            title: '环境已开通',
+            lines: [`节点：${node.name}`, `设备：${limitIp} 台`, `流量：${doc.trafficGB || 0}G`, `到期日：${expireText}`],
+          }),
+        })
+      }
+    } catch {
+      /* 邮件失败不影响开通 */
+    }
   } catch (e: any) {
     console.error('[provision] failed:', e?.message || e)
     await payload
@@ -290,6 +366,36 @@ export const Orders: CollectionConfig = {
                 PLAN_LABEL[doc.plan] || doc.plan
               } · ${BILLING_LABEL[doc.billing] || doc.billing}\n金额：¥${doc.amount}\n备注：${doc.note || '—'}`,
             )
+
+            // 给客户发待支付提醒（下单后没付钱的，这是最多的漏单场景）
+            if (customer?.email) {
+              const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
+              await sendMail(req.payload, {
+                to: customer.email,
+                type: 'order_pending',
+                customerId: customer.id,
+                dedupeKey: `pending-${doc.orderNo}`,
+                subject: `订单已创建：${BILLING_LABEL[doc.billing] || '订单'} ¥${doc.amount}`,
+                html: renderMail({
+                  title: '订单已创建，等待付款',
+                  body: `
+                    <p>你好${customer.name ? `，${customer.name}` : ''}：</p>
+                    <p>你的订单已经生成，付完款我们马上给你开通。</p>
+                    <ul style="padding-left:20px;margin:12px 0">
+                      <li>订单号：<b>${doc.orderNo}</b></li>
+                      <li>内容：${PLAN_LABEL[doc.plan] || doc.plan} · ${BILLING_LABEL[doc.billing] || doc.billing}</li>
+                      <li>金额：<b>¥${doc.amount}</b></li>
+                    </ul>
+                    <p style="color:#6b7f92;font-size:13px">付款时备注订单号，客服确认后自动开通。</p>
+                  `,
+                  cta: { label: '查看订单', url: `${site}/orders` },
+                }),
+                text: renderMailText({
+                  title: '订单已创建，等待付款',
+                  lines: [`订单号：${doc.orderNo}`, `金额：¥${doc.amount}`, '付款备注订单号，客服确认后自动开通'],
+                }),
+              })
+            }
           } catch {
             /* 推送失败不影响订单 */
           }

@@ -72,6 +72,7 @@ export interface Config {
     customers: Customer;
     'email-codes': EmailCode;
     captchas: Captcha;
+    'mail-logs': MailLog;
     media: Media;
     services: Service;
     tickets: Ticket;
@@ -90,6 +91,7 @@ export interface Config {
     customers: CustomersSelect<false> | CustomersSelect<true>;
     'email-codes': EmailCodesSelect<false> | EmailCodesSelect<true>;
     captchas: CaptchasSelect<false> | CaptchasSelect<true>;
+    'mail-logs': MailLogsSelect<false> | MailLogsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     services: ServicesSelect<false> | ServicesSelect<true>;
     tickets: TicketsSelect<false> | TicketsSelect<true>;
@@ -254,6 +256,24 @@ export interface Captcha {
   expiresAt?: string | null;
   usedAt?: string | null;
   ip?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * 所有客户邮件的发送记录（用于限流、去重和排查）
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mail-logs".
+ */
+export interface MailLog {
+  id: number;
+  to: string;
+  type: string;
+  subject?: string | null;
+  status?: ('sent' | 'failed' | 'skipped') | null;
+  error?: string | null;
+  customerId?: number | null;
+  dedupeKey?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -528,6 +548,10 @@ export interface PayloadLockedDocument {
         value: number | Captcha;
       } | null)
     | ({
+        relationTo: 'mail-logs';
+        value: number | MailLog;
+      } | null)
+    | ({
         relationTo: 'media';
         value: number | Media;
       } | null)
@@ -688,6 +712,21 @@ export interface CaptchasSelect<T extends boolean = true> {
   expiresAt?: T;
   usedAt?: T;
   ip?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mail-logs_select".
+ */
+export interface MailLogsSelect<T extends boolean = true> {
+  to?: T;
+  type?: T;
+  subject?: T;
+  status?: T;
+  error?: T;
+  customerId?: T;
+  dedupeKey?: T;
   updatedAt?: T;
   createdAt?: T;
 }
