@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getPayload } from 'payload'
 import React from 'react'
@@ -5,6 +6,12 @@ import React from 'react'
 import config from '@/payload.config'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: '案例库',
+  description: '内部交付记录，暂不对外展示。',
+  robots: { index: false, follow: false },
+}
 
 const CATEGORY_LABEL: Record<string, string> = {
   deploy: '部署',

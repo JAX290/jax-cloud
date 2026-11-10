@@ -33,6 +33,22 @@ export const SiteSettings: GlobalConfig = {
       defaultValue: 'jax31415',
     },
     {
+      name: 'whatsapp',
+      type: 'text',
+      label: 'WhatsApp 联系链接',
+      admin: {
+        description: '点开就能聊的链接，如 https://wa.me/qr/xxxxx 或 https://wa.me/8613800000000',
+      },
+    },
+    {
+      name: 'whatsappQrUrl',
+      type: 'text',
+      label: 'WhatsApp 二维码图片地址',
+      admin: {
+        description: '先在「媒体」里上传图片，再把 URL 粘到这里，如 /api/media/file/whatsapp-qr.jpg',
+      },
+    },
+    {
       name: 'contactName',
       type: 'text',
       label: '对外称呼',

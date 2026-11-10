@@ -37,8 +37,8 @@ export default function LoginPage() {
   return (
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
-        <h1>登录</h1>
-        <p className="sub">登录后可查看自己的服务与工单。</p>
+        <h1>客户登录</h1>
+        <p className="sub">登录后可查看自己的网络环境、流量与工单。</p>
         {error ? <div className="alert alert-error">{error}</div> : null}
 
         <div className="field">
@@ -70,6 +70,10 @@ export default function LoginPage() {
 
         <div className="form-foot">
           <Link href="/forgot">忘记密码？</Link> · <Link href="/register">注册新账户</Link>
+        </div>
+
+        <div className="auth-hint">
+          员工 / 客服入口：<Link href="/staff">工作台登录</Link>
         </div>
       </form>
     </div>

@@ -1,7 +1,16 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
 # dependencies
 /node_modules
 /.pnp
 .pnp.js
+.yarn/install-state.gz
+
+/.idea/*
+!/.idea/runConfigurations
+
+# testing
+/coverage
 
 # next.js
 /.next/
@@ -19,27 +28,26 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env
-.env
-.env.*
-!.env.example
+# local env files
 .env*.local
+
+# vercel
+.vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
+.env
+
 # sqlite
 /jax.db
 /jax.db-*
-/data/*
-!/data/.gitkeep
 
-# uploads
-/media/*
-!/media/.gitkeep
+/media
 
-# playwright
+# Playwright
+node_modules/
 /test-results/
 /playwright-report/
 /blob-report/

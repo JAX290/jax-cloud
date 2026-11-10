@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>JAX CLOUD · 客户海报</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #02040a; font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  .poster {
+    position: relative;
+    width: 1600px;
+    height: 1000px;
+    overflow: hidden;
+    padding: 62px 72px 54px;
+    color: #e8f3ff;
+    background:
+      radial-gradient(55% 55% at 78% 8%, rgba(124, 77, 255, 0.22), transparent 62%),
+      radial-gradient(45% 45% at 8% 12%, rgba(0, 229, 255, 0.14), transparent 60%),
+      linear-gradient(160deg, #05070f 0%, #070d1a 55%, #04060d 100%);
+  }
+  .poster::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: linear-gradient(180deg, #000 5%, transparent 80%);
+    pointer-events: none;
+  }
+  .top { position: relative; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+  .brand { font-weight: 800; letter-spacing: 0.16em; font-size: 19px; }
+  .brand span { color: #00e5ff; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 14px; border-radius: 999px;
+    border: 1px solid rgba(0, 229, 255, 0.36);
+    color: #bfe9ff; font-size: 12px; letter-spacing: 0.14em;
+    background: rgba(0, 229, 255, 0.06);
+  }
+  .badge i { width: 7px; height: 7px; border-radius: 50%; background: #39ff88; box-shadow: 0 0 10px #39ff88; }
+
+  .grid { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 700px; gap: 54px; margin-top: 58px; align-items: start; }
+
+  .eyebrow { color: #00e5ff; font-size: 13px; letter-spacing: 0.24em; margin-bottom: 16px; }
+  h1 { margin: 0 0 20px; font-size: 58px; line-height: 1.16; letter-spacing: 0.01em; }
+  h1 em { font-style: normal; background: linear-gradient(120deg, #9df6ff, #00e5ff 45%, #9b7bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { margin: 0; color: #b9cde0; font-size: 17px; line-height: 1.8; max-width: 620px; }
+
+  .features { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 34px; max-width: 640px; }
+  .feature {
+    padding: 16px 18px; border-radius: 12px;
+    border: 1px solid rgba(0, 229, 255, 0.14);
+    background: rgba(9, 16, 30, 0.62);
+  }
+  .feature b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .feature span { font-size: 12.5px; color: #8ea6c0; }
+  .feature i { color: #00e5ff; font-style: normal; margin-right: 6px; }
+
+  .cta { display: flex; align-items: center; gap: 16px; margin-top: 34px; }
+  .wx {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 12px 18px; border-radius: 12px;
+    border: 1px solid rgba(0, 229, 255, 0.32);
+    background: rgba(3, 10, 20, 0.7);
+  }
+  .wx .k { font-size: 10.5px; color: #8ea6c0; letter-spacing: 0.12em; }
+  .wx .v { font-size: 19px; font-weight: 700; color: #e8f3ff; letter-spacing: 0.02em; }
+  .cta .hint { color: #6f879e; font-size: 12px; line-height: 1.7; }
+
+  .platforms {
+    border: 1px solid rgba(0, 229, 255, 0.2);
+    border-radius: 20px;
+    padding: 26px 26px 22px;
+    background: rgba(7, 13, 24, 0.72);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  }
+  .platforms .ph { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .platforms h2 { margin: 0; font-size: 20px; }
+  .platforms .note { color: #6f879e; font-size: 11.5px; }
+  .platforms .sub { color: #8ea6c0; font-size: 12.5px; margin: 0 0 18px; }
+  .plats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .plat {
+    height: 108px; border-radius: 14px; background: #fff;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    position: relative; overflow: hidden;
+  }
+  .plat .name { font-weight: 800; letter-spacing: -0.02em; }
+  /* amazon */
+  .amazon { flex-direction: column; gap: 2px; }
+  .amazon .name { color: #111; font-size: 30px; line-height: 1; letter-spacing: -0.04em; font-weight: 700; }
+  .amazon .smile { width: 76px; height: 10px; border-bottom: 4px solid #ff9900; border-radius: 0 0 60% 60%; margin-top: -2px; }
+  /* shopify */
+  .shopify .bag {
+    width: 34px; height: 38px; background: #95bf47; border-radius: 5px 5px 7px 7px;
+    position: relative; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 18px;
+  }
+  .shopify .bag::before {
+    content: ""; position: absolute; top: -10px; left: 7px; width: 20px; height: 13px;
+    border: 3px solid #95bf47; border-bottom: 0; border-radius: 9px 9px 0 0;
+  }
+  .shopify .name { color: #5e8e3e; font-size: 24px; font-weight: 700; }
+  /* tiktok */
+  .tiktok .note { font-size: 40px; line-height: 1; color: #000; text-shadow: 3px 0 #25f4ee, -3px 0 #fe2c55; }
+  .tiktok .name { color: #111; font-size: 22px; }
+  /* temu */
+  .temu .name { color: #fb7701; font-size: 34px; letter-spacing: -0.03em; }
+  /* facebook */
+  .facebook .f {
+    width: 38px; height: 38px; border-radius: 50%; background: #1877f2; color: #fff;
+    display: grid; place-items: center; font-weight: 800; font-size: 24px; line-height: 1; padding-top: 2px;
+  }
+  .facebook .name { color: #1877f2; font-size: 22px; }
+  /* ebay */
+  .ebay .name { font-size: 32px; letter-spacing: -0.03em; }
+  .ebay .e { color: #e53238; } .ebay .b { color: #0064d2; } .ebay .a { color: #f5af02; } .ebay .y { color: #86b817; }
+
+  .facts { display: flex; gap: 10px; margin-top: 16px; }
+  .fact { flex: 1; text-align: center; padding: 10px 6px; border-radius: 10px; background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.12); }
+  .fact b { display: block; color: #dff8ff; font-size: 13px; }
+  .fact span { color: #6f879e; font-size: 11px; }
+
+  .bottom {
+    position: absolute; left: 72px; right: 72px; bottom: 34px; z-index: 2;
+    display: flex; justify-content: space-between; gap: 20px; align-items: center;
+    border-top: 1px solid rgba(0, 229, 255, 0.12); padding-top: 14px;
+    color: #6f879e; font-size: 12px;
+  }
+  .bottom b { color: #bfe9ff; font-weight: 600; }
+
+  .flow {
+    position: absolute; left: 72px; right: 72px; bottom: 92px; z-index: 2;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  }
+  .flow .s {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: 12px;
+    border: 1px solid rgba(0, 229, 255, 0.12);
+    background: rgba(9, 16, 30, 0.55);
+  }
+  .flow .s b { color: #00e5ff; font-size: 12px; letter-spacing: 0.12em; font-weight: 600; }
+  .flow .s span { color: #c3d6e8; font-size: 14px; }
+  .flow .s em { font-style: normal; color: #6f879e; font-size: 11px; margin-left: auto; }
+</style>
+</head>
+<body>
+<section class="poster" id="poster">
+  <div class="top">
+    <div class="brand">JAX <span>//</span> CLOUD</div>
+    <div class="badge"><i></i> SERVICE COVERAGE</div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="eyebrow">CROSS-BORDER INFRASTRUCTURE</div>
+      <h1>跨境电商<br><em>基础设施服务</em></h1>
+      <p class="lead">
+        服务器部署 · 环境配置 · 运维托管。为跨境业务提供独立、稳定、可长期运行的服务器环境，从开箱到上线由我们完成。
+      </p>
+
+      <div class="features">
+        <div class="feature"><b><i>◈</i>独立资源</b><span>独享 CPU / 内存 / 磁盘，环境隔离</span></div>
+        <div class="feature"><b><i>⌁</i>环境配置</b><span>系统、运行环境、安全加固一次到位</span></div>
+        <div class="feature"><b><i>◔</i>监控备份</b><span>7×24 监控，每日备份，异常告警</span></div>
+        <div class="feature"><b><i>▣</i>工单响应</b><span>专属工单，首次响应 ≤ 30 分钟</span></div>
+      </div>
+
+      <div class="cta">
+        <div class="wx">
+          <div>
+            <div class="k">WECHAT</div>
+            <div class="v">jax31415</div>
+          </div>
+        </div>
+        <div class="hint">扫码或搜索微信<br>备注「服务器」优先通过</div>
+      </div>
+    </div>
+
+    <div class="platforms">
+      <div class="ph">
+        <h2>适用业务平台</h2>
+        <span class="note">非平台官方合作</span>
+      </div>
+      <p class="sub">以下为常见跨境电商业务场景，我们只提供服务器与基础设施技术服务。</p>
+
+      <div class="plats">
+        <div class="plat amazon"><div class="name">amazon</div><div class="smile"></div></div>
+        <div class="plat shopify"><div class="bag">S</div><div class="name">Shopify</div></div>
+        <div class="plat tiktok"><div class="note">♪</div><div class="name">TikTok Shop</div></div>
+        <div class="plat temu"><div class="name">Temu</div></div>
+        <div class="plat facebook"><div class="f">f</div><div class="name">Facebook</div></div>
+        <div class="plat ebay"><div class="name"><span class="e">e</span><span class="b">b</span><span class="a">a</span><span class="y">y</span></div></div>
+      </div>
+
+      <div class="facts">
+        <div class="fact"><b>独立部署</b><span>¥388 起</span></div>
+        <div class="fact"><b>运维托管</b><span>¥80/月起</span></div>
+        <div class="fact"><b>年付优惠</b><span>9 折</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="s"><b>01</b><span>需求沟通</span><em>配置 / 预算</em></div>
+    <div class="s"><b>02</b><span>部署交付</span><em>系统 / 环境</em></div>
+    <div class="s"><b>03</b><span>上线验收</span><em>安全 / 解析</em></div>
+    <div class="s"><b>04</b><span>按月运维</span><em>监控 / 工单</em></div>
+  </div>
+
+  <div class="bottom">
+    <span>© 2026 JAX CLOUD · 仅提供合法的服务器部署、环境配置与运维技术服务</span>
+    <span><b>禁止一切违法违规业务接入</b> · 仅做技术交流与学习</span>
+  </div>
+</section>
+</body>
+</html>

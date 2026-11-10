@@ -74,6 +74,9 @@ export interface Config {
     services: Service;
     tickets: Ticket;
     cases: Case;
+    posts: Post;
+    orders: Order;
+    nodes: Node;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -87,6 +90,9 @@ export interface Config {
     services: ServicesSelect<false> | ServicesSelect<true>;
     tickets: TicketsSelect<false> | TicketsSelect<true>;
     cases: CasesSelect<false> | CasesSelect<true>;
+    posts: PostsSelect<false> | PostsSelect<true>;
+    orders: OrdersSelect<false> | OrdersSelect<true>;
+    nodes: NodesSelect<false> | NodesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -188,6 +194,12 @@ export interface Customer {
   name?: string | null;
   phone?: string | null;
   wechat?: string | null;
+  trialUsed?: boolean | null;
+  trialStopped?: boolean | null;
+  trialClientEmail?: string | null;
+  trialNodeId?: number | null;
+  trialSubId?: string | null;
+  trialExpiresAt?: string | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -240,6 +252,15 @@ export interface Service {
   price?: number | null;
   cycle?: ('one-time' | 'monthly' | 'yearly') | null;
   status: 'active' | 'suspended' | 'expired';
+  startedAt?: string | null;
+  /**
+   * 每行一条，客户后台会按条目展示。这里是核心交付内容。
+   */
+  subscriptionContent?: string | null;
+  /**
+   * 客户后台显示；续费 12 个月按 9 折自动计算。
+   */
+  renewalMonthlyPrice?: number | null;
   expiresAt?: string | null;
   serverIp?: string | null;
   notes?: string | null;
@@ -302,6 +323,134 @@ export interface Case {
   createdAt: string;
 }
 /**
+ * 发布后自动进 sitemap.xml，并推 IndexNow 给 Bing
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts".
+ */
+export interface Post {
+  id: number;
+  title: string;
+  /**
+   * 例子：amazon-multi-store-ip，会成为 /blog/amazon-multi-store-ip
+   */
+  slug: string;
+  category?: ('troubleshoot' | 'compare' | 'case') | null;
+  /**
+   * 一句话说清这篇解决什么问题，会被用作 meta description
+   */
+  excerpt?: string | null;
+  cover?: (number | null) | Media;
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  tags?: string | null;
+  published?: boolean | null;
+  publishedAt?: string | null;
+  /**
+   * 填一个未来时间，到点由定时任务自动勾「已发布」并推 IndexNow；留空则等你手动勾发布
+   */
+  publishAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "orders".
+ */
+export interface Order {
+  id: number;
+  orderNo?: string | null;
+  customer: number | Customer;
+  plan: 'basic' | 'advanced';
+  billing: 'deploy' | 'traffic' | 'topup' | 'upgrade';
+  amount: number;
+  days?: number | null;
+  trafficGB?: number | null;
+  ipLimit?: number | null;
+  status: 'pending' | 'paid' | 'active' | 'expired' | 'failed';
+  /**
+   * 客户填写的付款备注，如「微信已转，昵称小明」
+   */
+  note?: string | null;
+  /**
+   * 客户自己下单自动记「客户自助」；客服在后台代客下单请改成「客服后台」
+   */
+  source?: ('customer' | 'staff') | null;
+  paidAt?: string | null;
+  provisionedAt?: string | null;
+  /**
+   * 开通后自动写入，如 10086-1
+   */
+  clientEmail?: string | null;
+  /**
+   * 升级差价订单用：要升级的那个客户端 email（如 10044-3）
+   */
+  upgradeClientEmail?: string | null;
+  /**
+   * 续费订单用：要续费的那个客户端 email（如 10044-1）。收款后自动加时长 + 累加流量
+   */
+  renewClientEmail?: string | null;
+  /**
+   * 确认收款/开通的客服
+   */
+  operator?: string | null;
+  changeLog?:
+    | {
+        at?: string | null;
+        by?: string | null;
+        detail?: string | null;
+        reason?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "nodes".
+ */
+export interface Node {
+  id: number;
+  /**
+   * 如「洛杉矶-01」
+   */
+  name: string;
+  ip: string;
+  region?: string | null;
+  panelPort?: number | null;
+  panelPath?: string | null;
+  /**
+   * 探测时自动获取，也可手动填
+   */
+  token?: string | null;
+  subPort?: number | null;
+  subPath?: string | null;
+  status?: ('online' | 'offline' | 'maintenance') | null;
+  lastCheckAt?: string | null;
+  /**
+   * 留空表示不限
+   */
+  capacity?: number | null;
+  clientCount?: number | null;
+  note?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -348,6 +497,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'cases';
         value: number | Case;
+      } | null)
+    | ({
+        relationTo: 'posts';
+        value: number | Post;
+      } | null)
+    | ({
+        relationTo: 'orders';
+        value: number | Order;
+      } | null)
+    | ({
+        relationTo: 'nodes';
+        value: number | Node;
       } | null);
   globalSlug?: string | null;
   user:
@@ -434,6 +595,12 @@ export interface CustomersSelect<T extends boolean = true> {
   name?: T;
   phone?: T;
   wechat?: T;
+  trialUsed?: T;
+  trialStopped?: T;
+  trialClientEmail?: T;
+  trialNodeId?: T;
+  trialSubId?: T;
+  trialExpiresAt?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -482,6 +649,9 @@ export interface ServicesSelect<T extends boolean = true> {
   price?: T;
   cycle?: T;
   status?: T;
+  startedAt?: T;
+  subscriptionContent?: T;
+  renewalMonthlyPrice?: T;
   expiresAt?: T;
   serverIp?: T;
   notes?: T;
@@ -540,6 +710,79 @@ export interface CasesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts_select".
+ */
+export interface PostsSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  category?: T;
+  excerpt?: T;
+  cover?: T;
+  content?: T;
+  tags?: T;
+  published?: T;
+  publishedAt?: T;
+  publishAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "orders_select".
+ */
+export interface OrdersSelect<T extends boolean = true> {
+  orderNo?: T;
+  customer?: T;
+  plan?: T;
+  billing?: T;
+  amount?: T;
+  days?: T;
+  trafficGB?: T;
+  ipLimit?: T;
+  status?: T;
+  note?: T;
+  source?: T;
+  paidAt?: T;
+  provisionedAt?: T;
+  clientEmail?: T;
+  upgradeClientEmail?: T;
+  renewClientEmail?: T;
+  operator?: T;
+  changeLog?:
+    | T
+    | {
+        at?: T;
+        by?: T;
+        detail?: T;
+        reason?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "nodes_select".
+ */
+export interface NodesSelect<T extends boolean = true> {
+  name?: T;
+  ip?: T;
+  region?: T;
+  panelPort?: T;
+  panelPath?: T;
+  token?: T;
+  subPort?: T;
+  subPath?: T;
+  status?: T;
+  lastCheckAt?: T;
+  capacity?: T;
+  clientCount?: T;
+  note?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -587,6 +830,14 @@ export interface SiteSetting {
   heroTitle?: string | null;
   heroSub?: string | null;
   wechat?: string | null;
+  /**
+   * 点开就能聊的链接，如 https://wa.me/qr/xxxxx 或 https://wa.me/8613800000000
+   */
+  whatsapp?: string | null;
+  /**
+   * 先在「媒体」里上传图片，再把 URL 粘到这里，如 /api/media/file/whatsapp-qr.jpg
+   */
+  whatsappQrUrl?: string | null;
   contactName?: string | null;
   email?: string | null;
   disclaimer?: string | null;
@@ -612,6 +863,8 @@ export interface SiteSettingsSelect<T extends boolean = true> {
   heroTitle?: T;
   heroSub?: T;
   wechat?: T;
+  whatsapp?: T;
+  whatsappQrUrl?: T;
   contactName?: T;
   email?: T;
   disclaimer?: T;

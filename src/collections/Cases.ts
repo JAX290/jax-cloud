@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
+import { notifyIndexNow } from '../lib/indexnow'
+
 const isAdmin = (user: any) => user?.collection === 'users'
 
 export const Cases: CollectionConfig = {
@@ -18,6 +20,22 @@ export const Cases: CollectionConfig = {
     create: ({ req: { user } }: any) => isAdmin(user),
     update: ({ req: { user } }: any) => isAdmin(user),
     delete: ({ req: { user } }: any) => isAdmin(user),
+  },
+  hooks: {
+    // 案例发布/更新后主动推给 Bing（IndexNow），不用等它自己按 sitemap 发现
+    afterChange: [
+      async ({ doc }: any) => {
+        try {
+          if (!doc?.published) return
+          const slug = String(doc.slug || doc.id || '').trim()
+          const paths = ['/', '/cases']
+          if (slug) paths.push(`/cases/${encodeURIComponent(slug)}`)
+          await notifyIndexNow(paths)
+        } catch {
+          /* 推送失败不影响保存 */
+        }
+      },
+    ],
   },
   fields: [
     {

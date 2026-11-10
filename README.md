@@ -1,216 +1,195 @@
-# JAX CLOUD
+# JAX CLOUD · 全栈版（本地开发）
 
-跨境电商服务器部署 / 运维服务的展示站 + 客户后台 + Payload 管理后台。
+Next.js 16 + Payload CMS 3 + SQLite（本地开发用）。
 
-- 前台：Next.js 16 App Router
-- 后台：Payload CMS 3（SQLite）
-- 部署：Docker Compose + Tailscale（只允许 tailnet 访问，不开放公网）
+已包含：
 
-## 一键部署（全新 Debian 12/13）
+- 邮箱注册 / 验证 / 登录 / 找回密码 / 重置密码
+- 客户中心：我的服务、我的工单
+- 工单：新建、对话、状态
+- 管理后台 `/admin`：客户、服务、工单、案例、站点设置
+- 邮件：本地 SMTP 捕获器（开发）；生产填企业邮箱 SMTP
 
-不需要提前生成 key。以 **root** 登录全新服务器，执行**一条命令**：
+## 环境要求
 
-```bash
-apt-get update -qq && apt-get install -y -qq curl ca-certificates && curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | bash
+- Node.js ≥ 20.9（本机 24.x）
+- pnpm（本机 12.x）
+
+## 首次启动
+
+```powershell
+cd D:\project\tools\jax-app
+& "$env:APPDATA\npm\pnpm.cmd" install
 ```
 
-运行后 Tailscale 会输出一个登录链接：
+复制环境变量：
 
-```
-To authenticate, visit:
-https://login.tailscale.com/a/xxxxxxxx
-```
-
-把这个链接复制到浏览器（手机或电脑都行），用你的 Tailscale 账号登录并点 **Confirm**。
-终端会自动继续，后面全自动完成。
-
-> 如果想无人值守安装，也可以提前生成 Auth Key 带上（一条命令）：
->
-> ```bash
-> apt-get update -qq && apt-get install -y -qq curl ca-certificates && curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/install.sh | bash -s -- --authkey tskey-auth-xxxxxxxxxxxx
-> ```
-
-也可以 clone 后执行：
-
-```bash
-git clone https://github.com/JAX290/jax-cloud.git
-cd jax-cloud
-sudo bash install.sh
+```powershell
+Copy-Item .env.example .env
 ```
 
-脚本会依次完成：
+初始化数据（会创建管理员、演示客户、示例服务/工单/案例）：
 
-1. 安装 Tailscale，加入 tailnet，开启 Tailscale SSH
-2. 配置 2G swap（4G 内存构建 Next.js 用）
-3. 安装 Docker / docker compose
-4. 下载本仓库代码到 `/opt/jax-cloud`
-5. 构建镜像并启动，应用只绑定 Tailscale IP
-6. 首次启动自动初始化数据库和演示数据
-7. 开启 ufw：拒绝公网入站，只放行 `tailscale0`
+```powershell
+& "$env:APPDATA\npm\pnpm.cmd" seed
+```
 
-## 部署完成后
+启动本地邮件捕获器（另开一个终端）：
 
-脚本会输出 Tailscale IP，例如 `100.82.92.35`：
+```powershell
+pnpm dev:smtp
+```
 
-| 入口 | 地址 |
+启动开发服务器：
+
+```powershell
+pnpm dev
+```
+
+打开：
+
+- 前台：http://localhost:3000
+- 后台：http://localhost:3000/admin
+
+## 演示账号
+
+| 角色 | 邮箱 | 密码 |
+|---|---|---|
+| 管理员 | `admin@jax.local` | `JaxAdmin123!` |
+| 客户 | `demo@jax.local` | `Demo123456!` |
+
+> 演示客户已标记邮箱验证，可直接登录。
+
+## 验证邮件在哪看
+
+本地 SMTP 捕获器会把整封邮件打印在 `pnpm dev:smtp` 的终端里，包括验证链接和重置链接。不会真正发出去。
+
+## 生产邮件
+
+把 `.env` 改成企业邮箱 SMTP：
+
+```
+SMTP_HOST=smtp.exmail.qq.com
+SMTP_PORT=465
+SMTP_USER=no-reply@jax.markets
+SMTP_PASS=你的授权码
+EMAIL_FROM=no-reply@jax.markets
+```
+
+并配置 SPF / DKIM / DMARC。
+
+## 常用脚本
+
+| 命令 | 作用 |
 |---|---|
-| 前台 | `http://100.82.92.35:3000` |
-| 后台 | `http://100.82.92.35:3000/admin` |
+| `pnpm dev` | 开发服务器 |
+| `pnpm build` | 生产构建 |
+| `pnpm start` | 生产启动 |
+| `pnpm seed` | 初始化演示数据 |
+| `pnpm dev:smtp` | 本地邮件捕获器 |
+| `pnpm generate:types` | 生成 Payload 类型 |
+| `pnpm generate:importmap` | 生成后台 importMap |
 
-开启 MagicDNS 后也可以用：
+## 目录
 
 ```
-http://jax-cloud:3000
+jax-app/
+├─ src/
+│  ├─ app/
+│  │  ├─ (frontend)/        # 前台：首页、注册、登录、账户、工单
+│  │  ├─ (payload)/         # Payload 管理后台与 API
+│  │  └─ api/               # 自定义接口：建工单、回复工单、退出
+│  ├─ collections/          # Users / Customers / Services / Tickets / Cases / Media
+│  ├─ globals/SiteSettings.ts
+│  ├─ components/           # 客户端表单组件
+│  ├─ payload.config.ts
+│  └─ seed.ts
+├─ .env.example
+└─ package.json
 ```
 
-默认管理员：
+## 生产构建
 
+```powershell
+& "$env:APPDATA\npm\pnpm.cmd" build
+& "$env:APPDATA\npm\pnpm.cmd" start
 ```
-admin@jax.local / JaxAdmin123!
+
+## Docker 一键部署
+
+前置：
+
+- 干净的 VPS（**建议 2 核 4 GB 起**；首次构建比较吃内存）
+- 已安装 Docker 与 compose（或让脚本代装）
+- 域名 A 记录指向 VPS 公网 IP
+- 安全组放行 80 / 443
+
+Windows：
+
+```powershell
+cd D:\project\tools\jax-app
+powershell -ExecutionPolicy Bypass -File .\deploy.ps1 `
+  -Server root@<VPS_IP> -Domain cloud.jax.markets -InstallDocker
 ```
 
-登录后请立即修改密码。
-
-> 流量走 Tailscale（WireGuard 加密），所以内网访问用 HTTP 即可，不需要公网证书。
-
-## 参数
+Linux / macOS：
 
 ```bash
-bash install.sh --help
+cd jax-app
+./deploy.sh root@<VPS_IP> cloud.jax.markets
 ```
 
-| 参数 | 说明 |
-|---|---|
-| `--authkey KEY` | Tailscale Auth Key（必填，除非已登录） |
-| `--hostname NAME` | Tailscale 设备名，默认 `jax-cloud` |
-| `--app-dir DIR` | 安装目录，默认 `/opt/jax-cloud` |
-| `--no-firewall` | 不开启 ufw（调试用） |
-| `--local DIR` | 使用本地代码目录 |
+脚本会：打包源码（排除 node_modules）→ 上传到 `/opt/jax-app` → `docker compose up -d --build`。
+首次构建在服务器上跑，约 5–15 分钟；Caddy 自动申请 HTTPS。
 
-## Tailscale ACL 建议
+数据卷：
 
-如果要限制谁能 SSH / 访问：
+- `./data` → SQLite 数据库（`/app/data/jax.db`）
+- `./media` → 上传的图片
+- `./caddy-nodes` → 节点面板反代片段（自动生成）
+- `./caddy-snippets` → 面板免登录 Cookie（自动生成）
 
-```json
-{
-  "tagOwners": {
-    "tag:server": ["autogroup:admin"]
-  },
-  "ssh": [
-    {
-      "action": "accept",
-      "src": ["autogroup:member"],
-      "dst": ["tag:server"],
-      "users": ["root", "autogroup:nonroot"]
-    }
-  ]
-}
-```
+更新：改完代码重新执行同一条部署命令即可。
 
-## 关闭公网访问
+## 节点面板反代（自动生成，不用手改）
 
-脚本默认执行：
+每台节点的 3x-ui 面板都通过主控 Caddy 反代给 Tailscale 内网：端口 = `31000 + 节点 id`，
+例如节点 id=1 → `http://100.124.251.8:31001/hsdf.../`。
+
+- `scripts/sync-caddy-nodes.sh`：每分钟按数据库生成 `caddy-nodes/node-<id>.caddy`，有变化才 reload Caddy；
+  节点删除后自动清理片段。部署时还会顺手装好 cron。
+- `docker-compose.yml`：端口区间 `31001-31050` 一次映射完，新增节点不用再改编排文件。
+- `scripts/refresh-panel-sessions.sh`：每 3 小时登录各节点面板，把 session Cookie 写进
+  `caddy-snippets/node-<id>.caddy`，实现点开面板免登录；登录失败会清空旧 Cookie。
+
+所以新节点用一键脚本装完、自动注册到主控后，**1 分钟内**反代和免登录都会自动生效。
+
+
+日志：
 
 ```bash
-ufw default deny incoming
-ufw allow in on tailscale0
-ufw allow 41641/udp
-ufw --force enable
+ssh root@<VPS_IP> "cd /opt/jax-app && docker compose logs -f app"
 ```
 
-公网 `22 / 80 / 443 / 3000` 都会不可达，只能从 tailnet 访问。
+## 已验证的流程
 
-云厂商安全组也建议一并关闭 22/80/443 入站。
+- `pnpm build` 通过，生产模式路由 200
+- 注册 → SMTP 捕获器收到验证邮件 → 点击链接验证成功
+- 登录 → `/account` 显示客户信息、服务、工单
+- 浏览器内新建工单 → 跳转工单详情 → 回复成功
+- 管理员 `admin@jax.local` 可登录 `/api/users/login` 与 `/admin`
 
-如果把自己锁在外面，用云厂商的 VNC / Web Console 登录，执行：
+## 正式上线前
 
-```bash
-ufw disable
-```
+1. 改 `.env`：`PAYLOAD_SECRET`、`SERVER_URL`、`SITE_ADDRESS`
+2. 改管理员密码（后台或数据库）
+3. 邮件改成企业邮箱 SMTP，并配置 SPF / DKIM / DMARC
+4. 备份 `data/jax.db` 与 `media/`
+5. 删除或修改演示账号 `demo@jax.local`
+6. 如需更大规模，把 SQLite 换成 Postgres（Payload 支持 `@payloadcms/db-postgres`）
 
-## 更新代码
+## 安全说明
 
-服务器上执行：
-
-```bash
-bash /opt/jax-cloud/update.sh
-```
-
-也可以远程一条命令（不需要先登录服务器）：
-
-```bash
-curl -fsSL -H "Accept: application/vnd.github.raw" https://api.github.com/repos/JAX290/jax-cloud/contents/update.sh | bash
-```
-
-脚本会自动：
-
-1. 备份 `data/`、`media/`、`.env` 到 `/root/jax-backups`（保留最近 5 份）
-2. 下载 GitHub 最新代码
-3. 同步源码，**保留** `data/`、`media/`、`.env`
-4. 构建新镜像
-5. 自动同步数据库结构（新增字段不需要手动迁移）
-6. 启动并健康检查
-
-更新前想手动备份也可以：
-
-```bash
-cd /opt/jax-cloud
-tar -czf /root/jax-backup-$(date +%F).tar.gz data media .env
-```
-
-## 数据
-
-| 内容 | 位置 |
-|---|---|
-| SQLite | `/opt/jax-cloud/data/jax.db` |
-| 上传文件 | `/opt/jax-cloud/media/` |
-| 环境变量 | `/opt/jax-cloud/.env` |
-
-备份直接打包 `data/` 和 `media/` 即可。
-
-## 目录结构
-
-```
-src/                         Next.js + Payload 源码
-public/cases/                案例配图
-Dockerfile
-docker-compose.tailscale.yml Tailscale 专用（只绑 Tailscale IP）
-docker-compose.yml           可选：公网 Caddy 模式
-install.sh                   一键部署脚本
-update.sh                    更新脚本（备份 + 拉代码 + 重建）
-```
-
-## 邮件
-
-`SMTP_*` 为空时注册/登录不受影响，但「忘记密码」发不出邮件。
-
-配置 `/opt/jax-cloud/.env` 后重启：
-
-```bash
-cd /opt/jax-cloud
-docker compose -f docker-compose.tailscale.yml up -d
-```
-
-## 常见问题
-
-**Tailscale 没起来**
-
-```bash
-tailscale status
-tailscale up --ssh
-```
-
-**应用起不来**
-
-```bash
-cd /opt/jax-cloud
-docker compose -f docker-compose.tailscale.yml logs --tail=100 app
-```
-
-**磁盘不够**
-
-Docker 构建缓存可以清理：
-
-```bash
-docker system prune -af
-```
+- 客户只能读取自己的服务与工单（Payload access control + 接口二次校验）
+- 自定义工单接口会校验登录态与工单归属
+- 生产请修改 `PAYLOAD_SECRET`、管理员密码，并启用 HTTPS

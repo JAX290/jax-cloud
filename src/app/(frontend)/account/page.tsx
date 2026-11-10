@@ -5,7 +5,27 @@ import { getPayload } from 'payload'
 import React from 'react'
 
 import LogoutButton from '@/components/LogoutButton'
+import TrialButton from '@/components/TrialButton'
 import config from '@/payload.config'
+import CopyButton from '@/components/CopyButton'
+import RenewButton from '@/components/RenewButton'
+import ResetSubButton from '@/components/ResetSubButton'
+import SubQr from '@/components/SubQr'
+import TrafficChart from '@/components/TrafficChart'
+import UpgradeButton from '@/components/UpgradeButton'
+import { listNodeClients } from '@/lib/node-client'
+import { cachedClientGroupsForCustomer, readNodeCache } from '@/lib/node-cache'
+import { daysToExpiry, trafficRatio } from '@/lib/renew'
+import { TRIAL_GB, TRIAL_HOURS, trialSubUrl } from '@/lib/trial'
+import { readTrafficSeries } from '@/lib/traffic'
+import { resolveSubscription } from '@/lib/sub'
+import {
+  pickCustomerClients,
+  clientUsedBytes,
+  getSubConfig,
+  buildSubLink,
+  panelHost,
+} from '@/lib/panel'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +37,19 @@ const STATUS_LABEL: Record<string, string> = {
   pending: '处理中',
   resolved: '已解决',
   closed: '已关闭',
+}
+
+const ORDER_PLAN_LABEL: Record<string, string> = {
+  basic: '基础版',
+  advanced: '进阶版',
+}
+
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: '待支付',
+  paid: '已收款',
+  active: '已开通',
+  expired: '已取消',
+  failed: '开通失败',
 }
 
 const PLAN_LABEL: Record<string, string> = {
@@ -46,6 +79,24 @@ function money(value: number) {
   return `¥${Number(value).toLocaleString('zh-CN')}`
 }
 
+function formatBytes(value?: number) {
+  const v = Number(value || 0)
+  if (v <= 0) return '0'
+  const gb = v / 1024 / 1024 / 1024
+  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)}G`
+  const mb = v / 1024 / 1024
+  if (mb >= 1) return `${mb.toFixed(0)}M`
+  return `${Math.max(1, Math.round(v / 1024))}K`
+}
+
+function formatExpiry(ts?: number) {
+  const v = Number(ts || 0)
+  if (!v) return '长期'
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return '长期'
+  return d.toLocaleDateString('zh-CN')
+}
+
 export default async function AccountPage() {
   const headers = await getHeaders()
   const payload = await getPayload({ config })
@@ -57,7 +108,67 @@ export default async function AccountPage() {
 
   const customer = user as any
 
-  const [services, tickets] = await Promise.all([
+  // 联系方式（WhatsApp 入口用）
+  let siteSettings: any = null
+  try {
+    siteSettings = await payload.findGlobal({ slug: 'site-settings' })
+  } catch {
+    siteSettings = null
+  }
+  const waLink = String(siteSettings?.whatsapp || '')
+
+  // 体验倒计时（服务端算一次，够页面展示用）
+  const trialLeftMinutes = customer.trialExpiresAt
+    ? Math.max(0, Math.ceil((Date.parse(customer.trialExpiresAt) - Date.now()) / 60000))
+    : 0
+  const trialLeftText =
+    trialLeftMinutes >= 60
+      ? `${Math.floor(trialLeftMinutes / 60)} 小时 ${trialLeftMinutes % 60} 分钟`
+      : `${trialLeftMinutes} 分钟`
+
+  // 聚合所有节点：在线节点实时取客户端，离线节点用上次健康检查的缓存兜底
+  const nodesRes: any = await payload
+    .find({
+      collection: 'nodes',
+      limit: 100,
+      overrideAccess: true,
+    })
+    .catch(() => ({ docs: [] }))
+
+  const allNodes = (nodesRes.docs || []) as any[]
+  const onlineNodes = allNodes.filter((n) => n.status === 'online')
+  const offlineNodes = allNodes.filter((n) => n.status !== 'online')
+
+  const allPanelClients: any[] = []
+  for (const n of onlineNodes) {
+    try {
+      const cls = await listNodeClients(n)
+      allPanelClients.push(...cls)
+    } catch {
+      /* 单节点失败不影响其他 */
+    }
+  }
+
+  // 节点挂掉的客户：用缓存告诉客户「你这几个环境所在的节点在维护」
+  const nodeCache = readNodeCache()
+  const offlineGroups = cachedClientGroupsForCustomer(
+    nodeCache,
+    offlineNodes.map((n) => n.id),
+    Number(customer.customerNo || 0),
+  )
+
+  const ordersRes: any = await payload
+    .find({
+      collection: 'orders',
+      where: { customer: { equals: customer.id }, billing: { equals: 'deploy' } },
+      sort: '-createdAt',
+      limit: 20,
+      overrideAccess: true,
+    })
+    .catch(() => ({ docs: [] }))
+  const deployOrders = (ordersRes.docs || []) as any[]
+
+  const [services, tickets, subConfig] = await Promise.all([
     payload.find({
       collection: 'services',
       where: { customer: { equals: customer.id } },
@@ -74,7 +185,40 @@ export default async function AccountPage() {
       limit: 50,
       sort: '-updatedAt',
     }),
+    getSubConfig(),
   ])
+
+  const rawClients = pickCustomerClients(allPanelClients, Number(customer.customerNo || 0))
+  // 迁移过程中新旧节点可能同时存在同名客户端，按 email 去重
+  const seenEmails = new Set<string>()
+  const panelClients = rawClients.filter((c) => {
+    const key = String(c.email || '')
+    if (!key || seenEmails.has(key)) return false
+    seenEmails.add(key)
+    return true
+  })
+  const host = panelHost()
+
+  // 近一年流量时序（折线图前端可按日/周/月聚合）
+  const trafficSeriesMap = new Map<number, Array<{ day: string; used: number }>>()
+  for (const c of panelClients) {
+    trafficSeriesMap.set(c.id, readTrafficSeries(String(c.email || ''), 366))
+  }
+
+  // 预取每个客户端的 vless 单条链接（供「从剪贴板导入」用）
+  const vlessMap = new Map<number, string>()
+  await Promise.all(
+    panelClients.map(async (c) => {
+      if (!c.subId) return
+      try {
+        const resolved = await resolveSubscription(String(c.subId))
+        const link = resolved?.links?.[0]
+        if (link) vlessMap.set(c.id, link)
+      } catch {
+        /* 忽略单个失败 */
+      }
+    }),
+  )
 
   const deployServices = services.docs.filter((service: any) =>
     String(service.plan || '').startsWith('deploy'),
@@ -95,9 +239,17 @@ export default async function AccountPage() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <Link className="btn btn-primary" href="/account/tickets/new">
+            <Link className="btn btn-primary" href="/download">
+              下载客户端
+            </Link>
+            <Link className="btn btn-ghost" href="/account/tickets/new">
               提交工单
             </Link>
+            {waLink ? (
+              <a className="btn btn-ghost" href={waLink} target="_blank" rel="noreferrer">
+                WhatsApp 联系
+              </a>
+            ) : null}
             <LogoutButton />
           </div>
         </div>
@@ -105,100 +257,234 @@ export default async function AccountPage() {
         <div className="account-stack">
           <section className="panel">
             <div className="panel-head">
-              <h2>我的订阅</h2>
-              <span className="muted">按月服务、到期时间与续费价格</span>
+              <h2>1 小时体验</h2>
+              <span className="muted">
+                每账号限一次 · {TRIAL_HOURS} 小时 · {TRIAL_GB}G
+              </span>
             </div>
 
-            {monthlyServices.length ? (
-              <div className="subs-grid">
-                {monthlyServices.map((service: any) => {
-                  const remaining = daysLeft(service.expiresAt)
-                  const isExpired = service.status === 'expired' || (remaining !== null && remaining < 0)
-                  const monthly = Number(
-                    service.renewalMonthlyPrice ??
-                      (service.cycle === 'monthly' ? service.price : 0) ??
-                      0,
-                  )
-                  const annual = monthly > 0 ? Math.round(monthly * 12 * 0.9) : 0
-                  const saved = monthly > 0 ? Math.round(monthly * 12 - annual) : 0
-                  const contentLines = String(service.subscriptionContent || '')
-                    .split('\n')
-                    .map((line: string) => line.trim())
-                    .filter(Boolean)
+            {!customer.trialUsed ? (
+              <>
+                <p className="muted" style={{ marginTop: 0 }}>
+                  先试再买：开一个 {TRIAL_HOURS} 小时、{TRIAL_GB}G 流量的测试环境，到期自动停用，不用付款。
+                </p>
+                <TrialButton />
+              </>
+            ) : customer.trialStopped ? (
+              <p className="muted" style={{ margin: 0 }}>
+                体验已结束。想继续用，可以在下面的「我的订阅」里选套餐，或者直接找客服。
+              </p>
+            ) : (
+              <>
+                <p className="muted" style={{ marginTop: 0 }}>
+                  体验中，还剩 <b style={{ color: 'var(--cyan)' }}>{trialLeftText}</b>，到期会自动停用。
+                </p>
+                {customer.trialSubId ? (
+                  <p style={{ margin: 0, fontSize: 13 }}>
+                    订阅链接：
+                    <a href={trialSubUrl(customer.trialSubId)}>{trialSubUrl(customer.trialSubId)}</a>
+                  </p>
+                ) : null}
+              </>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="panel-head">
+              <h2>我的订阅</h2>
+              <span className="muted">实时数据 · 来自节点面板</span>
+            </div>
+
+            {offlineGroups.length ? (
+              <div className="account-alert">
+                <b>节点维护中</b>
+                <span>
+                  {offlineGroups
+                    .map(
+                      (g) =>
+                        `${g.nodeName} 上的 ${g.clients.map((c) => c.email).join('、')}`,
+                    )
+                    .join('；')}
+                  {' '}
+                  暂时连不上，我们已经在处理，恢复后会第一时间通知你。着急的话可以先提个工单。
+                </span>
+              </div>
+            ) : null}
+
+            {panelClients.length ? (
+              <div className="env-grid">
+                {panelClients.map((c) => {
+                  const used = clientUsedBytes(c)
+                  const limit = Number(c.totalGB || 0)
+                  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0
+                  const left = daysToExpiry(c.expiryTime)
+
+                  const isAdvanced = Number(c.limitIp || 0) >= 8
+                  const planLabel = isAdvanced ? '进阶版' : '入门版'
+                  // 中央订阅服务：链接固定，换节点客户无感
+                  const subLink = c.subId ? `https://sub.jax.markets/sub/${c.subId}` : ''
 
                   return (
-                    <article className="sub-card" key={service.id}>
-                      <div className="sub-top">
+                    <article className="env-card" key={c.id}>
+                      <div className="env-top">
                         <div>
-                          <div className="sub-type">{PLAN_LABEL[service.plan] || '服务'}</div>
-                          <h3>{service.title}</h3>
-                          <div className="sub-spec">
-                            {service.spec || '—'}
-                            {service.startedAt ? ` · 开通于 ${formatDate(service.startedAt)}` : ''}
+                          <div className="env-id">{c.email}</div>
+                          <div className="env-sub">
+                            {planLabel} · {isAdvanced ? '专线' : '共享线路'} · 1 个 IP · 最多{' '}
+                            {c.limitIp ? `${c.limitIp} 台设备` : '不限设备'}
                           </div>
                         </div>
-                        <span className={`status ${isExpired ? 'expired' : service.status}`}>
-                          {isExpired ? '已到期' : STATUS_LABEL[service.status] || service.status}
-                        </span>
                       </div>
 
-                      <div className="sub-grid">
-                        <div>
-                          <span>服务到期</span>
-                          <b>{formatDate(service.expiresAt)}</b>
-                          <em className={remaining !== null && remaining <= 7 ? 'warn' : ''}>
-                            {remaining === null
-                              ? '长期有效'
-                              : remaining < 0
-                                ? `已过期 ${Math.abs(remaining)} 天`
-                                : `剩余 ${remaining} 天`}
-                          </em>
+                      <div className="env-bar">
+                        <div className="env-bar-head">
+                          <span>流量已用</span>
+                          <b>
+                            {formatBytes(used)}
+                            {limit > 0 ? ` / ${formatBytes(limit)}` : ' / 不限'}
+                          </b>
                         </div>
-                        <div>
-                          <span>续费月价</span>
-                          <b>{monthly > 0 ? money(monthly) : '—'}</b>
-                          <em>{monthly > 0 ? '/ 月' : '一次性服务'}</em>
-                        </div>
-                        <div>
-                          <span>续费 12 个月</span>
-                          <b>{annual > 0 ? money(annual) : '—'}</b>
-                          <em>{annual > 0 ? `9 折 · 省 ${money(saved)}` : '无需续费'}</em>
+                        <div className="bar">
+                          <i style={{ width: `${limit > 0 ? pct : 0}%` }} />
                         </div>
                       </div>
 
-                      {contentLines.length ? (
-                        <div className="sub-content">
-                          <div className="sub-label">订阅内容</div>
-                          <ul>
-                            {contentLines.map((line: string, index: number) => (
-                              <li key={index}>{line}</li>
-                            ))}
-                          </ul>
+                      <div className="env-meta">
+                        <div>
+                          <span>到期</span>
+                          <b>{formatExpiry(c.expiryTime)}</b>
+                        </div>
+                        <div>
+                          <span>剩余</span>
+                          <b>{left === null ? '长期' : left < 0 ? '已过期' : `${left} 天`}</b>
+                        </div>
+                        <div>
+                          <span>状态</span>
+                          <b>{c.enable ? '正常' : '停用'}</b>
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const leftDays = daysToExpiry(c.expiryTime)
+                        const ratio = trafficRatio(used, Number(c.totalGB || 0))
+                        const hint =
+                          leftDays !== null && leftDays < 0
+                            ? '已到期，续费后到期日从现在开始算，马上就能用'
+                            : leftDays !== null && leftDays <= 7
+                              ? `还有 ${leftDays} 天到期，先续上，到期日直接往后顺延`
+                              : ratio >= 0.9
+                                ? '流量快用完了，续一份新额度接着用'
+                                : '提前续费更稳：到期日顺延，配置和链接都不动'
+                        return (
+                          <div className="env-renew">
+                            <span className="env-renew-hint">{hint}</span>
+                            <RenewButton
+                              clientEmail={String(c.email || '')}
+                              customerId={Number(customer.id)}
+                              currentExpiry={Number(c.expiryTime || 0)}
+                              currentTotalGB={Number(c.totalGB || 0)}
+                              usedBytes={used}
+                            />
+                          </div>
+                        )
+                      })()}
+
+                      <div className="env-sub-link">
+                        <div className="env-sub-label">订阅链接（自动更新）</div>
+                        {subLink ? (
+                          <>
+                            <div className="env-sub-url">{subLink}</div>
+                            <div className="env-sub-btns">
+                              <CopyButton value={subLink} label="复制订阅" />
+                              <ResetSubButton clientEmail={String(c.email || '')} />
+                            </div>
+                            <div className="env-hint">
+                              用法：客户端 →「订阅分组」→ 添加订阅 → 粘贴链接 → 更新。以后换节点自动同步。
+                            </div>
+                          </>
+                        ) : (
+                          <div className="env-sub-url muted">订阅服务未开启，请联系客服</div>
+                        )}
+                      </div>
+
+                      {vlessMap.get(c.id) ? (
+                        <div className="env-vless">
+                          <div className="env-sub-label">节点链接（快速导入）</div>
+                          <div className="env-vless-url">{vlessMap.get(c.id)}</div>
+                          <CopyButton value={vlessMap.get(c.id)!} label="复制节点" />
+                          <details className="env-qr">
+                            <summary>扫码导入节点</summary>
+                            <SubQr value={vlessMap.get(c.id)!} label="手机扫码直接导入" />
+                          </details>
+                          <div className="env-hint">
+                            用法：复制后，在客户端节点列表右键（手机点右上角＋）→「从剪贴板导入」，一步到位。不自动更新。
+                          </div>
                         </div>
                       ) : null}
 
-                      <div className="sub-foot">
-                        <span>
-                          {monthly > 0
-                            ? '续费 12 个月按 9 折结算，到期前续费可保留当前配置与数据。'
-                            : '一次性交付服务，无需续费。'}
-                        </span>
-                        {monthly > 0 ? (
-                          <Link className="btn btn-ghost" href="/account/tickets/new?subject=申请续费">
-                            申请续费
-                          </Link>
-                        ) : null}
-                      </div>
+                      <details className="env-traffic">
+                        <summary>流量统计（日 / 周 / 月）</summary>
+                        <TrafficChart
+                          series={trafficSeriesMap.get(c.id) || []}
+                          totalUsed={used}
+                          totalGB={limit}
+                        />
+                      </details>
+
+                      {!isAdvanced ? (
+                        <div className="env-upgrade">
+                          <span>升级进阶版 · 补 ¥100 · 增至 8 台设备</span>
+                          <UpgradeButton
+                            clientEmail={String(c.email || '')}
+                            customerId={Number(customer.id)}
+                          />
+                        </div>
+                      ) : null}
                     </article>
                   )
                 })}
               </div>
             ) : (
-              <div className="empty">还没有按月订阅。联系客服开通后会显示在这里。</div>
+              <div className="empty">
+                还没有开通网络环境。联系客服开通后，这里会显示 IP、流量和在线状态。
+              </div>
             )}
           </section>
 
-          {deployServices.length ? (
+          <section className="panel">
+            <div className="panel-head">
+              <h2>我的部署</h2>
+              <span className="muted">
+                部署购买记录 · <Link href="/orders">全部订单 →</Link>
+              </span>
+            </div>
+
+            {deployOrders.length ? (
+              <div className="deploy-list">
+                {deployOrders.map((o: any) => (
+                  <div className="deploy-item" key={o.id}>
+                    <div>
+                      <div className="deploy-item-no">{o.orderNo}</div>
+                      <div className="deploy-item-meta">
+                        {ORDER_PLAN_LABEL[o.plan] || '—'} · {formatDate(o.createdAt)}
+                        {o.clientEmail ? ` · 客户端 ${o.clientEmail}` : ' · 未开通'}
+                      </div>
+                    </div>
+                    <div className="deploy-item-right">
+                      <b>{money(o.amount)}</b>
+                      <span className={`deploy-badge ${o.status}`}>
+                        {ORDER_STATUS_LABEL[o.status] || o.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty">还没有部署记录。购买部署后会显示在这里。</div>
+            )}
+          </section>
+
+          {false ? (
             <section className="panel">
               <div className="panel-head">
                 <h2>部署线路</h2>

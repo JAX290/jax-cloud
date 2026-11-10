@@ -32,10 +32,19 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # 节点面板反代端口：31001–31050（31000 + 节点 id），仅 Tailscale 内网使用
+      # 整段映射一次到位，新增节点不需要再改这里
+      - "31001-31050:31001-31050"
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-cloud.jax.markets}
+      # 主控 Tailscale 地址：换服务器只改 .env 里的 PANEL_HOST
+      PANEL_HOST: ${PANEL_HOST:-100.124.251.8}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-nodes:/etc/caddy/nodes:ro
+      - ./caddy-snippets:/etc/caddy/snippets:ro
+      - ./media:/srv/media:ro
+      - ./backups:/srv/backups:ro
       - caddy_data:/data
       - caddy_config:/config
 

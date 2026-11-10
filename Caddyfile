@@ -1,10 +1,93 @@
 {$SITE_ADDRESS:cloud.jax.markets} {
 	encode gzip zstd
-	reverse_proxy app:3000
+
+	# 内部页面（工作台 / 后台）：仅允许 Tailscale 内网访问
+	@internal path /staff /staff/* /admin /admin/*
+	handle @internal {
+		@notTailscale not remote_ip 100.64.0.0/10
+		respond @notTailscale "Not Found" 404
+		reverse_proxy app:3000
+	}
+
+	# 客户端安装包：必须先登录（forward_auth 校验 cookie），再由 Caddy 直出文件
+	handle /downloads/* {
+		forward_auth app:3000 {
+			uri /api/auth/check
+			copy_headers X-Forwarded-User
+		}
+		root * /srv/media
+		file_server
+	}
+
+	handle {
+		reverse_proxy app:3000
+	}
+
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
 		-Server
+	}
+
+	# 私有页面 / 接口不进搜索索引（robots.txt 里也禁了，这里是双保险）
+	@private path /account /account/* /orders /orders/* /download /download/* /login /login/* /register /register/* /forgot /forgot/* /reset /reset/* /verify /verify/* /staff /staff/* /admin /admin/* /api/* /sub/*
+	header @private X-Robots-Tag "noindex, nofollow"
+}
+
+# Tailscale 内网入口：连上 Tailscale 后访问 http://<PANEL_HOST>/staff
+# 地址来自 .env 的 PANEL_HOST（换服务器只改这里，不用改 Caddyfile）
+# 走 WireGuard 加密，不需要证书
+http://{$PANEL_HOST:100.124.251.8} {
+	encode gzip
+
+	# 数据库备份下载（只读，仅 Tailscale 内网；公网访问不到）
+	# 供 NAS / 本地电脑定时拉取，配合 scripts/backup-db.sh
+	# 注意：用 handle_path 去掉 /backups 前缀，root 才对应 /srv/backups
+	handle_path /backups/* {
+		@notTailscale not remote_ip 100.64.0.0/10
+		respond @notTailscale "Not Found" 404
+		header {
+			X-Robots-Tag "noindex, nofollow"
+			-Server
+		}
+		root * /srv/backups
+		file_server browse
+	}
+
+	reverse_proxy app:3000
+}
+
+# ===== 节点面板反代（自动生成，不要手改这里）=====
+# 每台节点一个片段：端口 = 31000 + 节点 id，仅 Tailscale 内网可访问
+#   节点 id=1 → http://100.124.251.8:31001/，节点 id=2 → http://100.124.251.8:31002/
+# 片段文件由 scripts/sync-caddy-nodes.sh 按数据库自动生成（/opt/jax-app/caddy-nodes/），
+# 免登录 Cookie 由 scripts/refresh-panel-sessions.sh 写（/opt/jax-app/caddy-snippets/）。
+# 结果：新节点注册后 1 分钟内自动可用，不用改 Caddyfile，也不用改 docker-compose.yml。
+import /etc/caddy/nodes/*.caddy
+
+# 中央订阅服务：所有客户端的统一订阅入口，链接永远不变
+# 订阅响应里是客户的真实节点配置 → 必须禁止搜索引擎收录
+sub.jax.markets {
+	encode gzip
+	header {
+		X-Content-Type-Options nosniff
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	# 订阅域名的 robots.txt：全站禁止
+	handle /robots.txt {
+		respond `User-agent: *
+Disallow: /` 200
+	}
+
+	handle /sub/* {
+		reverse_proxy app:3000
+	}
+
+	# 订阅域名不做内容站，其余路径 301 回主站，避免重复内容
+	handle {
+		redir https://cloud.jax.markets{uri} 301
 	}
 }

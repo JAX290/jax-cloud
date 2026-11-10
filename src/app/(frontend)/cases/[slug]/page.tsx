@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
@@ -6,6 +7,26 @@ import React from 'react'
 import config from '@/payload.config'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const doc: any = await findCase(slug)
+  if (!doc || !doc.published) {
+    return { title: '案例未找到', robots: { index: false, follow: false } }
+  }
+  const title = doc.title || '案例'
+  const description = String(doc.description || '').slice(0, 140)
+  return {
+    title,
+    description,
+    // 这些是我们自己的交付记录，暂不对外收录
+    robots: { index: false, follow: false },
+  }
+}
 
 const CATEGORY_LABEL: Record<string, string> = {
   deploy: '部署',

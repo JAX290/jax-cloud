@@ -88,5 +88,43 @@ export const Customers: CollectionConfig = {
       type: 'text',
       label: '微信号',
     },
+    {
+      name: 'trialUsed',
+      type: 'checkbox',
+      label: '已领取体验',
+      defaultValue: false,
+      admin: { position: 'sidebar' },
+    },
+    {
+      name: 'trialStopped',
+      type: 'checkbox',
+      label: '体验已停用',
+      defaultValue: false,
+      admin: { position: 'sidebar' },
+    },
+    {
+      name: 'trialClientEmail',
+      type: 'text',
+      label: '体验客户端 email',
+      admin: { position: 'sidebar', readOnly: true },
+    },
+    {
+      name: 'trialNodeId',
+      type: 'number',
+      label: '体验所在节点 ID',
+      admin: { position: 'sidebar', readOnly: true },
+    },
+    {
+      name: 'trialSubId',
+      type: 'text',
+      label: '体验订阅 ID',
+      admin: { position: 'sidebar', readOnly: true },
+    },
+    {
+      name: 'trialExpiresAt',
+      type: 'date',
+      label: '体验到期时间',
+      admin: { position: 'sidebar', readOnly: true },
+    },
   ],
 }

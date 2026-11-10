@@ -11,3 +11,9 @@ data
 *.log
 .tmp-test
 dev-emails
+# runtime dirs, keep them out of the docker build context (backups are large)
+backups
+backup-secrets
+caddy-nodes
+caddy-snippets
+*.db.bak
