@@ -15,7 +15,8 @@ export const Nodes: CollectionConfig = {
   },
   access: {
     admin: ({ req: { user } }: any) => isAdmin(user),
-    read: () => true,
+    // 节点里存着 3x-ui API Token，绝不能公开读；服务端页面用 local API（默认 bypass access）
+    read: ({ req: { user } }: any) => isAdmin(user),
     create: ({ req: { user } }: any) => isAdmin(user),
     update: ({ req: { user } }: any) => isAdmin(user),
     delete: ({ req: { user } }: any) => isAdmin(user),

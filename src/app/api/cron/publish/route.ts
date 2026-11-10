@@ -28,7 +28,7 @@ function fmtBeijing(iso?: string) {
  * - 推企业微信：发了哪篇 + 还剩几篇 + 下一篇预计什么时候（北京时间）
  */
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET || 'jax-health-20261108'
+  const secret = process.env.CRON_SECRET || ''
   const provided = req.nextUrl.searchParams.get('secret') || ''
   if (provided !== secret) {
     return Response.json({ ok: false, message: 'forbidden' }, { status: 403 })

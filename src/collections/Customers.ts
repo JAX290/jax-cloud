@@ -1,7 +1,7 @@
 import { APIError, type CollectionConfig } from 'payload'
 
 import { nextCustomerNo } from '../lib/customerNo'
-import { renderMail } from '../lib/mail-templates'
+import { renderMail, renderMailText } from '../lib/mail-templates'
 import { sendMail } from '../lib/mailer'
 import { consumeCode } from '../lib/verify-code'
 
@@ -21,6 +21,7 @@ export const Customers: CollectionConfig = {
   },
   auth: {
     tokenExpiration: 60 * 60 * 24 * 7,
+    cookies: { secure: true, sameSite: 'Lax' },
     maxLoginAttempts: 8,
     lockTime: 10 * 60 * 1000,
     forgotPassword: {
@@ -55,6 +56,10 @@ export const Customers: CollectionConfig = {
         if (operation === 'create' && !data.customerNo) {
           data.customerNo = await nextCustomerNo(req.payload)
         }
+        // 记密码修改时间：afterChange 用它判断要不要发「密码已修改」邮件
+        if (operation === 'update' && data.password) {
+          data.passwordChangedAt = new Date().toISOString()
+        }
         return data
       },
     ],
@@ -87,6 +92,38 @@ export const Customers: CollectionConfig = {
           })
         } catch {
           /* 邮件失败不影响注册 */
+        }
+      },
+      // 密码被修改（重置）→ 发安全提醒，客户被盗号时能第一时间知道
+      async ({ doc, previousDoc, operation, req }: any) => {
+        try {
+          if (operation !== 'update' || !doc?.email) return
+          if (!doc?.passwordChangedAt) return
+          if (previousDoc?.passwordChangedAt === doc.passwordChangedAt) return
+          const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
+          await sendMail(req.payload, {
+            to: doc.email,
+            type: 'password_changed',
+            customerId: doc.id,
+            dedupeKey: `pwd-${doc.id}-${Date.now()}`,
+            subject: '你的 JAX CLOUD 密码已修改',
+            html: renderMail({
+              title: '密码已修改',
+              body: `
+                <p>你好${doc.name ? `，${doc.name}` : ''}：</p>
+                <p>你的账号密码刚刚被修改。</p>
+                <p>如果是你本人操作，忽略这封邮件即可。</p>
+                <p style="color:#6b7f92;font-size:13px">如果不是你操作，请立刻用「找回密码」重置，并联系客服。</p>
+              `,
+              cta: { label: '重置密码', url: `${site}/forgot` },
+            }),
+            text: renderMailText({
+              title: '密码已修改',
+              lines: ['你的账号密码刚刚被修改。', '如果不是你操作，请立刻重置密码并联系客服。'],
+            }),
+          })
+        } catch {
+          /* 邮件失败不影响改密 */
         }
       },
     ],
@@ -181,6 +218,12 @@ export const Customers: CollectionConfig = {
       type: 'text',
       virtual: true,
       admin: { hidden: true },
+    },
+    {
+      name: 'passwordChangedAt',
+      type: 'date',
+      label: '密码最后修改时间',
+      admin: { position: 'sidebar', readOnly: true },
     },
   ],
 }

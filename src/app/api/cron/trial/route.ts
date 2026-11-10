@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
  * - 有停用动作时推企业微信，方便运营知道谁在领体验
  */
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET || 'jax-health-20261108'
+  const secret = process.env.CRON_SECRET || ''
   const provided = req.nextUrl.searchParams.get('secret') || ''
   if (provided !== secret) {
     return Response.json({ ok: false, message: 'forbidden' }, { status: 403 })

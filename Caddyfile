@@ -1,8 +1,8 @@
 {$SITE_ADDRESS:cloud.jax.markets} {
 	encode gzip zstd
 
-	# 内部页面（工作台 / 后台）：仅允许 Tailscale 内网访问
-	@internal path /staff /staff/* /admin /admin/*
+	# 内部页面与内部接口（工作台 / 后台 / 管理员 API）：仅允许 Tailscale 内网访问
+	@internal path /staff /staff/* /admin /admin/* /api/users /api/users/* /api/staff /api/staff/* /api/graphql /api/graphql/* /api/graphql-playground /api/graphql-playground/*
 	handle @internal {
 		@notTailscale not remote_ip 100.64.0.0/10
 		respond @notTailscale "Not Found" 404
@@ -27,6 +27,9 @@
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
+		# 强制 HTTPS（180 天；先不加 includeSubDomains，避免影响以后可能的子域）
+		Strict-Transport-Security "max-age=15552000"
+		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 		-Server
 	}
 

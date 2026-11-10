@@ -16,6 +16,8 @@ export type MailType =
   | 'order_pending'
   | 'order_active'
   | 'renew_success'
+  | 'topup_success'
+  | 'upgrade_success'
   | 'expiry_7d'
   | 'expiry_1d'
   | 'expiry_day'
@@ -32,6 +34,8 @@ const CRITICAL: MailType[] = [
   'verify_code',
   'order_active',
   'renew_success',
+  'topup_success',
+  'upgrade_success',
   'expiry_day',
   'sub_reset',
   'order_cancelled',
@@ -48,6 +52,8 @@ const TYPE_LABEL: Record<string, string> = {
   order_pending: '待支付提醒',
   order_active: '开通通知',
   renew_success: '续费成功',
+  topup_success: '加油包到账',
+  upgrade_success: '升级成功',
   expiry_7d: '到期前 7 天',
   expiry_1d: '到期前 1 天',
   expiry_day: '到期当天',

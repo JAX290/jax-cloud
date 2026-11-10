@@ -9,6 +9,10 @@ export const Users: CollectionConfig = {
     group: '系统',
   },
   auth: {
+    maxLoginAttempts: 5,
+    lockTime: 15 * 60 * 1000,
+    tokenExpiration: 60 * 60 * 8,
+    cookies: { secure: true, sameSite: 'Lax' },
     strategies: [
       {
         name: 'tailscale-network',

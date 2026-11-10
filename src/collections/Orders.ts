@@ -84,6 +84,39 @@ async function provisionOrder(doc: any, req: any) {
       await sendWecom(
         `✅ **升级完成**\n订单：${doc.orderNo}\n客户端：${doc.upgradeClientEmail}\n升级为：${PLAN_LABEL[doc.plan] || doc.plan}（设备上限 ${newLimit} 台）\n节点：${found.node.name}`,
       )
+
+      // 升级成功邮件
+      try {
+        const custId = typeof doc.customer === 'object' ? doc.customer?.id : doc.customer
+        const cust: any = custId
+          ? await payload.findByID({ collection: 'customers', id: custId, depth: 0, overrideAccess: true })
+          : null
+        if (cust?.email) {
+          const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
+          await sendMail(payload, {
+            to: cust.email,
+            type: 'upgrade_success',
+            customerId: cust.id,
+            dedupeKey: `upgrade-${doc.id}`,
+            subject: `已升级为${PLAN_LABEL[doc.plan] || doc.plan}（设备上限 ${newLimit} 台）`,
+            html: renderMail({
+              title: '套餐已升级',
+              body: `
+                <p>你好${cust.name ? `，${cust.name}` : ''}：</p>
+                <p>你的客户端 <b>${doc.upgradeClientEmail}</b> 已升级为 <b>${PLAN_LABEL[doc.plan] || doc.plan}</b>，设备上限提升到 <b>${newLimit} 台</b>。</p>
+                <p style="color:#6b7f92;font-size:13px">订阅链接和设备都不用动，直接用就行。</p>
+              `,
+              cta: { label: '查看我的账户', url: `${site}/account` },
+            }),
+            text: renderMailText({
+              title: '套餐已升级',
+              lines: [`客户端：${doc.upgradeClientEmail}`, `设备上限：${newLimit} 台`],
+            }),
+          })
+        }
+      } catch {
+        /* 邮件失败不影响升级 */
+      }
       return
     }
 
@@ -142,15 +175,24 @@ async function provisionOrder(doc: any, req: any) {
         if (cust?.email) {
           const site = (process.env.SITE_URL || 'https://cloud.jax.markets').replace(/\/$/, '')
           const expireText = new Date(newPaidExpiry).toLocaleDateString('zh-CN')
+          const isTopup = doc.billing === 'topup'
           await sendMail(payload, {
             to: cust.email,
-            type: 'renew_success',
+            type: isTopup ? 'topup_success' : 'renew_success',
             customerId: cust.id,
-            dedupeKey: `renew-${doc.id}`,
-            subject: `续费已生效：+${days} 天（新的到期日 ${expireText}）`,
+            dedupeKey: isTopup ? `topup-${doc.id}` : `renew-${doc.id}`,
+            subject: isTopup
+              ? `加油包已到账：+${doc.trafficGB || 0}G`
+              : `续费已生效：+${days} 天（新的到期日 ${expireText}）`,
             html: renderMail({
-              title: '续费已生效',
-              body: `
+              title: isTopup ? '加油包已到账' : '续费已生效',
+              body: isTopup
+                ? `
+                <p>你好${cust.name ? `，${cust.name}` : ''}：</p>
+                <p>你买的加油包已经加上，<b>${doc.trafficGB || 0}G</b> 已累加到原有额度。</p>
+                <p style="color:#6b7f92;font-size:13px">不用改任何配置，客户端里刷新一下流量就会更新。</p>
+              `
+                : `
                 <p>你好${cust.name ? `，${cust.name}` : ''}：</p>
                 <p>你的续费已经自动生效，<b>订阅链接和设备都不用动</b>。</p>
                 <ul style="padding-left:20px;margin:12px 0">
@@ -162,8 +204,10 @@ async function provisionOrder(doc: any, req: any) {
               cta: { label: '查看我的账户', url: `${site}/account` },
             }),
             text: renderMailText({
-              title: '续费已生效',
-              lines: [`增加时长：${days} 天`, `增加流量：${doc.trafficGB || 0}G`, `新的到期日：${expireText}`],
+              title: isTopup ? '加油包已到账' : '续费已生效',
+              lines: isTopup
+                ? [`增加流量：${doc.trafficGB || 0}G`]
+                : [`增加时长：${days} 天`, `增加流量：${doc.trafficGB || 0}G`, `新的到期日：${expireText}`],
             }),
           })
         }
