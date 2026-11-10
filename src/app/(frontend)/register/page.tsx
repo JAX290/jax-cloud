@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
+import CaptchaInput, { type CaptchaValue } from '@/components/CaptchaInput'
+
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', code: '' })
   const [error, setError] = useState('')
@@ -11,6 +13,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const [captcha, setCaptcha] = useState<CaptchaValue>({ id: null, code: '' })
+  const [captchaRefresh, setCaptchaRefresh] = useState(0)
 
   // 发送验证码后的倒计时
   useEffect(() => {
@@ -26,17 +30,27 @@ export default function RegisterPage() {
       setError('先填一个正确的邮箱')
       return
     }
+    if (!captcha.id || captcha.code.length !== 4) {
+      setError('先填图形验证码（看不清点图片换一张）')
+      return
+    }
     setSending(true)
     try {
       const res = await fetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email, purpose: 'register' }),
+        body: JSON.stringify({
+          email: form.email,
+          purpose: 'register',
+          captchaId: captcha.id,
+          captchaCode: captcha.code,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.error || '发送失败，稍后再试')
       setNotice('验证码已发到你的邮箱，10 分钟内有效（找不到就看下垃圾箱）')
       setCooldown(60)
+      setCaptchaRefresh((n) => n + 1)
     } catch (err: any) {
       setError(err.message || '发送失败')
     } finally {
@@ -131,6 +145,8 @@ export default function RegisterPage() {
             autoComplete="email"
           />
         </div>
+
+        <CaptchaInput value={captcha} onChange={setCaptcha} refreshKey={captchaRefresh} />
 
         <div className="field">
           <label htmlFor="code">邮箱验证码 *</label>

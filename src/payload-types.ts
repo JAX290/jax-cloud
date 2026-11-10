@@ -71,6 +71,7 @@ export interface Config {
     users: User;
     customers: Customer;
     'email-codes': EmailCode;
+    captchas: Captcha;
     media: Media;
     services: Service;
     tickets: Ticket;
@@ -88,6 +89,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
     'email-codes': EmailCodesSelect<false> | EmailCodesSelect<true>;
+    captchas: CaptchasSelect<false> | CaptchasSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     services: ServicesSelect<false> | ServicesSelect<true>;
     tickets: TicketsSelect<false> | TicketsSelect<true>;
@@ -237,6 +239,21 @@ export interface EmailCode {
   expiresAt?: string | null;
   usedAt?: string | null;
   attempts?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * 发送验证邮件前的图形码，防轰炸
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "captchas".
+ */
+export interface Captcha {
+  id: number;
+  codeHash: string;
+  expiresAt?: string | null;
+  usedAt?: string | null;
+  ip?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -507,6 +524,10 @@ export interface PayloadLockedDocument {
         value: number | EmailCode;
       } | null)
     | ({
+        relationTo: 'captchas';
+        value: number | Captcha;
+      } | null)
+    | ({
         relationTo: 'media';
         value: number | Media;
       } | null)
@@ -655,6 +676,18 @@ export interface EmailCodesSelect<T extends boolean = true> {
   expiresAt?: T;
   usedAt?: T;
   attempts?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "captchas_select".
+ */
+export interface CaptchasSelect<T extends boolean = true> {
+  codeHash?: T;
+  expiresAt?: T;
+  usedAt?: T;
+  ip?: T;
   updatedAt?: T;
   createdAt?: T;
 }

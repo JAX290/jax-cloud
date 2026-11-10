@@ -5,11 +5,14 @@ import { sendCode, type CodePurpose } from '@/lib/verify-code'
 
 export const dynamic = 'force-dynamic'
 
+function clientIp(req: Request) {
+  const xff = req.headers.get('x-forwarded-for') || ''
+  return (xff.split(',')[0] || req.headers.get('x-real-ip') || 'unknown').trim()
+}
+
 /**
- * 发送邮箱验证码
- * POST /api/auth/send-code  { email, purpose?: 'register' | 'reset' }
- *
- * 注册页/找回密码页调用；内部做了 60 秒频控、已注册检查、6 位码哈希落库。
+ * 发送邮箱验证码（需先通过图形验证码）
+ * POST /api/auth/send-code { email, purpose?, captchaId, captchaCode }
  */
 export async function POST(req: Request) {
   let body: any = {}
@@ -26,7 +29,11 @@ export async function POST(req: Request) {
   }
 
   const payload = await getPayload({ config })
-  const result = await sendCode(payload, email, purpose)
+  const result = await sendCode(payload, email, purpose, {
+    captchaId: body?.captchaId,
+    captchaCode: body?.captchaCode,
+    ip: clientIp(req),
+  })
   if (!result.ok) {
     return Response.json({ ok: false, error: result.error }, { status: 400 })
   }

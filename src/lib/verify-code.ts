@@ -1,5 +1,6 @@
 import { createHash, randomInt } from 'node:crypto'
 
+import { verifyCaptcha } from './captcha'
 import { renderMail, renderMailText } from './mail-templates'
 
 /** 验证码有效期（分钟） */
@@ -24,36 +25,58 @@ export function genCode(): string {
   return String(randomInt(0, 1000000)).padStart(6, '0')
 }
 
-/** 发送验证码（内部会做频率限制 + 落库 + 发邮件） */
+/** 发送验证码（内部会做图形码校验 + 频率限制 + 落库 + 发邮件） */
 export async function sendCode(
   payload: any,
   emailRaw: string,
   purpose: CodePurpose,
+  opts: { captchaId?: any; captchaCode?: any; ip?: string } = {},
 ): Promise<{ ok: boolean; error?: string }> {
   const email = normalize(emailRaw)
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, error: '邮箱格式不对' }
   }
 
-  // 频率限制：同一邮箱 60 秒内只发一次
-  try {
-    const recent: any = await payload.find({
-      collection: 'email-codes',
-      where: {
-        and: [
-          { email: { equals: email } },
-          { purpose: { equals: purpose } },
-          { createdAt: { greater_than: new Date(Date.now() - CODE_RESEND_SECONDS * 1000).toISOString() } },
-        ],
-      },
-      limit: 1,
-      overrideAccess: true,
-    })
-    if ((recent.docs || []).length) {
-      return { ok: false, error: '刚发过一次，请 60 秒后再试' }
+  // 1) 先验图形验证码（防机器批量发信）
+  const captcha = await verifyCaptcha(payload, opts.captchaId, opts.captchaCode)
+  if (!captcha.ok) return { ok: false, error: captcha.error }
+
+  const ip = String(opts.ip || '').slice(0, 64)
+
+  // 2) 频率限制
+  const now = Date.now()
+  const since = (ms: number) => new Date(now - ms).toISOString()
+  const count = async (where: any) => {
+    try {
+      const res: any = await payload.find({
+        collection: 'email-codes',
+        where,
+        limit: 0,
+        overrideAccess: true,
+      })
+      return Number(res.totalDocs || 0)
+    } catch {
+      return 0
     }
-  } catch {
-    /* 查不到就继续 */
+  }
+
+  // 同一邮箱 60 秒一次
+  if ((await count({ and: [{ email: { equals: email } }, { createdAt: { greater_than: since(60 * 1000) } }] })) > 0) {
+    return { ok: false, error: '刚发过一次，请 60 秒后再试' }
+  }
+  // 同一邮箱 1 小时最多 3 次
+  if ((await count({ and: [{ email: { equals: email } }, { createdAt: { greater_than: since(3600 * 1000) } }] })) >= 3) {
+    return { ok: false, error: '这个邮箱一小时只能发 3 次验证码，稍后再试' }
+  }
+  // 同一邮箱 1 天最多 8 次
+  if ((await count({ and: [{ email: { equals: email } }, { createdAt: { greater_than: since(24 * 3600 * 1000) } }] })) >= 8) {
+    return { ok: false, error: '这个邮箱今天发得太多了，明天再试或直接找客服' }
+  }
+  // 同一 IP 1 小时最多 10 次（防止换邮箱刷）
+  if (ip && ip !== 'unknown') {
+    if ((await count({ and: [{ ip: { equals: ip } }, { createdAt: { greater_than: since(3600 * 1000) } }] })) >= 10) {
+      return { ok: false, error: '当前网络请求太频繁，1 小时后再试' }
+    }
   }
 
   // 注册场景：邮箱已注册就直接拒绝
@@ -84,6 +107,7 @@ export async function sendCode(
         purpose,
         codeHash: hashCode(email, purpose, code),
         expiresAt,
+        ip,
       },
       overrideAccess: true,
     })
