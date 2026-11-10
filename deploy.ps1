@@ -78,4 +78,8 @@ Write-Host "logs: ssh $Server 'cd /opt/jax-app && docker compose logs -f app'"
 
 # ---- 部署后自动清理旧镜像，避免 30G 盘被撑满 ----
 Write-Host "==> cleanup dangling images"
-& ssh $Server "docker image prune -af >/dev/null 2>&1; df -h / | tail -1"
+& ssh $Server "docker image prune -af >/dev/null 2>&1"
+
+# 磁盘用到 80% 以上时，连带清 build cache（平时留着让下次构建快一些）
+$diskAware = 'USED=$(df --output=pcent / | tail -1 | tr -dc "0-9"); if [ "$USED" -ge 80 ]; then echo "disk ${USED}% -> prune build cache"; docker builder prune -af >/dev/null 2>&1; fi; df -h / | tail -1'
+& ssh $Server $diskAware

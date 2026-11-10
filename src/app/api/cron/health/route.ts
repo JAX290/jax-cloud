@@ -284,7 +284,7 @@ export async function GET(req: Request) {
                   `<p>你好${cu.name ? `，${cu.name}` : ''}：</p>`,
                   `<p>你的网络环境已到期（付费到期日 ${new Date(paidExpiry(i.expiry)).toLocaleDateString('zh-CN')}）。</p>`,
                   `<p>我们为你保留了 <b>${GRACE_DAYS} 天</b>宽限期，这期间仍可正常使用。为了不影响店铺运营，建议尽快续费。</p>`,
-                  `<p>登录 <a href="https://cloud.jax.markets/account">cloud.jax.markets/account</a> 可以自助续费，也可以直接找客服。</p>`,
+                  `<p>登录 <a href="https://cloud.jax.markets/#pricing">cloud.jax.markets</a> 可以自助续费，也可以直接找客服。</p>`,
                 ].join(''),
               })
             } catch (mailErr: any) {
