@@ -30,16 +30,18 @@ export async function sendCode(
   payload: any,
   emailRaw: string,
   purpose: CodePurpose,
-  opts: { captchaId?: any; captchaCode?: any; ip?: string } = {},
+  opts: { captchaId?: any; captchaCode?: any; ip?: string; humanVerified?: boolean } = {},
 ): Promise<{ ok: boolean; error?: string }> {
   const email = normalize(emailRaw)
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, error: '邮箱格式不对' }
   }
 
-  // 1) 先验图形验证码（防机器批量发信）
-  const captcha = await verifyCaptcha(payload, opts.captchaId, opts.captchaCode)
-  if (!captcha.ok) return { ok: false, error: captcha.error }
+  // 1) 人机验证：路由层已验过 Turnstile 就跳过；否则校验图形码（降级模式）
+  if (!opts.humanVerified) {
+    const captcha = await verifyCaptcha(payload, opts.captchaId, opts.captchaCode)
+    if (!captcha.ok) return { ok: false, error: captcha.error }
+  }
 
   const ip = String(opts.ip || '').slice(0, 64)
 

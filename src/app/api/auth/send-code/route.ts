@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 
 import config from '@/payload.config'
+import { turnstileEnabled, verifyTurnstile } from '@/lib/turnstile'
 import { sendCode, type CodePurpose } from '@/lib/verify-code'
 
 export const dynamic = 'force-dynamic'
@@ -11,8 +12,10 @@ function clientIp(req: Request) {
 }
 
 /**
- * 发送邮箱验证码（需先通过图形验证码）
- * POST /api/auth/send-code { email, purpose?, captchaId, captchaCode }
+ * 发送邮箱验证码（需通过人机验证）
+ * POST /api/auth/send-code { email, purpose?, turnstileToken?, captchaId?, captchaCode? }
+ *
+ * 配了 Turnstile 就校验 token；没配则降级校验图形码。
  */
 export async function POST(req: Request) {
   let body: any = {}
@@ -28,11 +31,22 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: '请填写邮箱' }, { status: 400 })
   }
 
+  const ip = clientIp(req)
+  let humanVerified = false
+  if (turnstileEnabled()) {
+    const result = await verifyTurnstile(body?.turnstileToken, ip)
+    if (!result.ok) {
+      return Response.json({ ok: false, error: result.error }, { status: 400 })
+    }
+    humanVerified = true
+  }
+
   const payload = await getPayload({ config })
   const result = await sendCode(payload, email, purpose, {
     captchaId: body?.captchaId,
     captchaCode: body?.captchaCode,
-    ip: clientIp(req),
+    ip,
+    humanVerified,
   })
   if (!result.ok) {
     return Response.json({ ok: false, error: result.error }, { status: 400 })

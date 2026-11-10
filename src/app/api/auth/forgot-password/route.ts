@@ -1,15 +1,21 @@
 import { getPayload } from 'payload'
 
 import { verifyCaptcha } from '@/lib/captcha'
+import { turnstileEnabled, verifyTurnstile } from '@/lib/turnstile'
 import config from '@/payload.config'
 
 export const dynamic = 'force-dynamic'
 
+function clientIp(req: Request) {
+  const xff = req.headers.get('x-forwarded-for') || ''
+  return (xff.split(',')[0] || req.headers.get('x-real-ip') || 'unknown').trim()
+}
+
 /**
  * 找回密码（发重置链接）
- * POST /api/auth/forgot-password { email, captchaId, captchaCode }
+ * POST /api/auth/forgot-password { email, turnstileToken? | captchaId+captchaCode }
  *
- * 必须过图形验证码，防止被人拿邮箱轰炸；无论邮箱是否存在都返回同样的结果，避免探测。
+ * 无论邮箱是否存在都返回同样的结果，避免探测账号。
  */
 export async function POST(req: Request) {
   let body: any = {}
@@ -24,11 +30,19 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: '邮箱格式不对' }, { status: 400 })
   }
 
+  const ip = clientIp(req)
   const payload = await getPayload({ config })
 
-  const captcha = await verifyCaptcha(payload, body?.captchaId, body?.captchaCode)
-  if (!captcha.ok) {
-    return Response.json({ ok: false, error: captcha.error }, { status: 400 })
+  if (turnstileEnabled()) {
+    const result = await verifyTurnstile(body?.turnstileToken, ip)
+    if (!result.ok) {
+      return Response.json({ ok: false, error: result.error }, { status: 400 })
+    }
+  } else {
+    const captcha = await verifyCaptcha(payload, body?.captchaId, body?.captchaCode)
+    if (!captcha.ok) {
+      return Response.json({ ok: false, error: captcha.error }, { status: 400 })
+    }
   }
 
   try {

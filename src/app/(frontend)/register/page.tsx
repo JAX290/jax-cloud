@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
-import CaptchaInput, { type CaptchaValue } from '@/components/CaptchaInput'
+import VerifyHuman, { type VerifyValue } from '@/components/VerifyHuman'
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', code: '' })
@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [cooldown, setCooldown] = useState(0)
-  const [captcha, setCaptcha] = useState<CaptchaValue>({ id: null, code: '' })
+  const [verify, setVerify] = useState<VerifyValue>({ token: '', captchaId: null, captchaCode: '' })
   const [captchaRefresh, setCaptchaRefresh] = useState(0)
 
   // 发送验证码后的倒计时
@@ -30,8 +30,8 @@ export default function RegisterPage() {
       setError('先填一个正确的邮箱')
       return
     }
-    if (!captcha.id || captcha.code.length !== 4) {
-      setError('先填图形验证码（看不清点图片换一张）')
+    if (!verify.token && (!verify.captchaId || verify.captchaCode.length !== 4)) {
+      setError('先完成人机验证')
       return
     }
     setSending(true)
@@ -42,8 +42,9 @@ export default function RegisterPage() {
         body: JSON.stringify({
           email: form.email,
           purpose: 'register',
-          captchaId: captcha.id,
-          captchaCode: captcha.code,
+          turnstileToken: verify.token,
+          captchaId: verify.captchaId,
+          captchaCode: verify.captchaCode,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -146,7 +147,7 @@ export default function RegisterPage() {
           />
         </div>
 
-        <CaptchaInput value={captcha} onChange={setCaptcha} refreshKey={captchaRefresh} />
+        <VerifyHuman value={verify} onChange={setVerify} refreshKey={captchaRefresh} />
 
         <div className="field">
           <label htmlFor="code">邮箱验证码 *</label>

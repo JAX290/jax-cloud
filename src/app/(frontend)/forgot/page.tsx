@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { useState } from 'react'
 
-import CaptchaInput, { type CaptchaValue } from '@/components/CaptchaInput'
+import VerifyHuman, { type VerifyValue } from '@/components/VerifyHuman'
 
 export default function ForgotPage() {
   const [email, setEmail] = useState('')
-  const [captcha, setCaptcha] = useState<CaptchaValue>({ id: null, code: '' })
+  const [verify, setVerify] = useState<VerifyValue>({ token: '', captchaId: null, captchaCode: '' })
   const [captchaRefresh, setCaptchaRefresh] = useState(0)
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -16,8 +16,8 @@ export default function ForgotPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     setError('')
-    if (!captcha.id || captcha.code.length !== 4) {
-      setError('先填图形验证码（看不清点图片换一张）')
+    if (!verify.token && (!verify.captchaId || verify.captchaCode.length !== 4)) {
+      setError('先完成人机验证')
       return
     }
     setLoading(true)
@@ -25,7 +25,12 @@ export default function ForgotPage() {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, captchaId: captcha.id, captchaCode: captcha.code }),
+        body: JSON.stringify({
+          email,
+          turnstileToken: verify.token,
+          captchaId: verify.captchaId,
+          captchaCode: verify.captchaCode,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) throw new Error(data.error || '发送失败，稍后再试')
@@ -69,7 +74,7 @@ export default function ForgotPage() {
               />
             </div>
 
-            <CaptchaInput value={captcha} onChange={setCaptcha} refreshKey={captchaRefresh} />
+            <VerifyHuman value={verify} onChange={setVerify} refreshKey={captchaRefresh} />
 
             <button className="btn btn-primary btn-block" disabled={loading} type="submit">
               {loading ? '发送中…' : '发送重置邮件'}
