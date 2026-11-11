@@ -130,7 +130,7 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
               <Link href="/#services">服务</Link>
               <Link href="/#pricing">价格</Link>
               <Link href="/#cases">案例</Link>
-              <Link href="/blog">知识库</Link>
+              <Link href="/#blog">知识库</Link>
               <Link href="/#contact">联系</Link>
               {isCustomer ? (
                 <Link className="btn btn-primary" href="/account">

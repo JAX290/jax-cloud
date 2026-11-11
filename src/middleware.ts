@@ -16,9 +16,20 @@ const BLOCKED = ['/api/customers/forgot-password']
 
 /** 每个路径每小时允许的次数 */
 const LIMITS: Array<{ path: string; limit: number; windowMs: number }> = [
+  // 发邮件类（已被 Turnstile 保护，这里是第二层）
   { path: '/api/auth/send-code', limit: 20, windowMs: 60 * 60 * 1000 },
   { path: '/api/auth/forgot-password', limit: 20, windowMs: 60 * 60 * 1000 },
   { path: '/api/auth/captcha', limit: 120, windowMs: 60 * 60 * 1000 },
+  // 登录 / 注册 / 下单等写操作，防撞库和刷单
+  { path: '/api/customers/login', limit: 10, windowMs: 10 * 60 * 1000 },
+  { path: '/api/customers', limit: 15, windowMs: 60 * 60 * 1000 },
+  { path: '/api/checkout', limit: 20, windowMs: 60 * 60 * 1000 },
+  { path: '/api/renew', limit: 20, windowMs: 60 * 60 * 1000 },
+  { path: '/api/trial', limit: 10, windowMs: 60 * 60 * 1000 },
+  { path: '/api/reset-sub', limit: 10, windowMs: 60 * 60 * 1000 },
+  { path: '/api/ticket-create', limit: 10, windowMs: 60 * 60 * 1000 },
+  { path: '/api/ticket-reply', limit: 30, windowMs: 60 * 60 * 1000 },
+  { path: '/api/node-register', limit: 20, windowMs: 60 * 60 * 1000 },
 ]
 
 function ipOf(req: NextRequest) {
@@ -63,5 +74,19 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/auth/send-code', '/api/auth/forgot-password', '/api/auth/captcha', '/api/customers/forgot-password'],
+  matcher: [
+    '/api/auth/send-code',
+    '/api/auth/forgot-password',
+    '/api/auth/captcha',
+    '/api/customers/forgot-password',
+    '/api/customers/login',
+    '/api/customers',
+    '/api/checkout',
+    '/api/renew',
+    '/api/trial',
+    '/api/reset-sub',
+    '/api/ticket-create',
+    '/api/ticket-reply',
+    '/api/node-register',
+  ],
 }

@@ -15,6 +15,8 @@ DB="${DB:-$APP_DIR/data/jax.db}"
 SNIPPET_DIR="${SNIPPET_DIR:-$APP_DIR/caddy-snippets}"
 PANEL_USER="${PANEL_USER:-jaxadmin}"
 PANEL_PASS="${PANEL_PASS:-JaxPanel@2026!Secure}"
+# 每台节点独立面板凭据（推荐）：{"1":{"user":"..","pass":".."}, ...}，权限 600
+PANEL_CREDS="${PANEL_CREDS:-$APP_DIR/panel-creds.json}"
 CADDY_CONTAINER="${CADDY_CONTAINER:-jax-caddy}"
 CADDY_CONFIG="${CADDY_CONFIG:-/etc/caddy/Caddyfile}"
 
@@ -43,6 +45,26 @@ while IFS='|' read -r id ip port path; do
     base="http://$ip:$port/$path"
     snippet="$SNIPPET_DIR/node-${id}.caddy"
 
+    # 取该节点自己的面板账号（没有就退回环境变量/默认值）
+    node_user="$PANEL_USER"
+    node_pass="$PANEL_PASS"
+    if [ -f "$PANEL_CREDS" ]; then
+        read -r node_user node_pass <<EOF2
+$(python3 - "$PANEL_CREDS" "$id" "$PANEL_USER" "$PANEL_PASS" <<'PY'
+import json
+import sys
+path, nid, fallback_user, fallback_pass = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+try:
+    data = json.load(open(path, encoding='utf-8'))
+    c = data.get(str(nid)) or {}
+    print(c.get('user') or fallback_user, c.get('pass') or fallback_pass)
+except Exception:
+    print(fallback_user, fallback_pass)
+PY
+)
+EOF2
+    fi
+
     jar=$(mktemp)
     if ! curl -s -c "$jar" --max-time 10 "$base/" -o /dev/null 2>/dev/null; then
         echo "node-${id} (${ip}): unreachable"
@@ -62,7 +84,7 @@ while IFS='|' read -r id ip port path; do
 
     resp=$(curl -s -b "$jar" -c "$jar" --max-time 10 -X POST \
         -H "X-CSRF-Token: $csrf" \
-        -d "username=$PANEL_USER&password=$PANEL_PASS" \
+        -d "username=$node_user&password=$node_pass" \
         "$base/login" 2>/dev/null)
 
     if printf '%s' "$resp" | grep -q '"success":true'; then

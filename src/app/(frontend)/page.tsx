@@ -5,6 +5,7 @@ import React from 'react'
 
 import AddToCart from '@/components/AddToCart'
 import CartBar from '@/components/CartBar'
+import LexicalContent from '@/components/LexicalContent'
 
 import config from '@/payload.config'
 
@@ -178,6 +179,28 @@ export default async function HomePage() {
     }
   } catch {
     // 首次启动数据库为空时使用默认值
+  }
+
+  // 首页知识库：已发布文章，卡片默认折叠，点开看全文
+  let posts: any[] = []
+  try {
+    const found: any = await payload.find({
+      collection: 'posts',
+      where: { published: { equals: true } },
+      sort: '-publishedAt',
+      limit: 6,
+      depth: 1,
+      overrideAccess: true,
+    })
+    posts = (found.docs || []) as any[]
+  } catch {
+    posts = []
+  }
+
+  const BLOG_CAT: Record<string, string> = {
+    troubleshoot: '问题排查',
+    compare: '选型对比',
+    case: '案例复盘',
   }
 
   return (
@@ -457,6 +480,44 @@ export default async function HomePage() {
             <div className="note">
               年付 <b>立省 10%</b> · 首次部署首月流量免费 · 可先领 <b>1 小时体验（1G 流量）</b>，看完报告再决定。
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= 知识库 ================= */}
+      <section className="section" id="blog">
+        <div className="wrap">
+          <div className="section-head">
+            <div className="kicker">// 知识库</div>
+            <h2>踩过的坑，写成答案</h2>
+            <p>跨境环境里反复出现的问题，整理成能照着做的文章。点开卡片直接看全文。</p>
+          </div>
+
+          {posts.length ? (
+            <div className="grid grid-2 home-blog">
+              {posts.map((post: any) => (
+                <details className="card home-blog-card" key={post.id}>
+                  <summary>
+                    <span className="blog-cat">{BLOG_CAT[post.category] || '知识库'}</span>
+                    <h3>{post.title}</h3>
+                    {post.excerpt ? <p>{String(post.excerpt).slice(0, 110)}</p> : null}
+                    <span className="home-blog-more">展开看全文 →</span>
+                  </summary>
+                  <div className="home-blog-body">
+                    <LexicalContent content={post.content} />
+                    <Link className="home-blog-link" href={`/blog/${post.slug || post.id}`}>
+                      在独立页面看 →
+                    </Link>
+                  </div>
+                </details>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="home-cases-all">
+            <Link className="btn btn-ghost" href="/blog">
+              全部文章
+            </Link>
           </div>
         </div>
       </section>
